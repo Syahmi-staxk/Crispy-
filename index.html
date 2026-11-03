@@ -117,7 +117,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 6px 0 0;
 .notes { display: grid; gap: 6px; margin: 0; }
 .notes p { margin: 0; font-size: 13.5px; }
 .notes .warn { color: var(--warn); }
-.notes .bad { color: var(--bad); }
+.notes .bad { color: var(--bad); font-weight: 500; }
 .notes .info { color: var(--muted); }
 
 .actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
@@ -137,11 +137,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 6px 0 0;
 .part-head h3 { margin: 0; font-size: 15px; font-weight: 600; }
 .part-status { margin: 0; font-size: 13px; overflow-wrap: anywhere; }
 progress { width: 100%; height: 8px; accent-color: var(--accent); }
-.meter { position: relative; height: 8px; background: var(--track); border-radius: 4px; margin-top: 4px; }
-.meter i { display: block; height: 100%; border-radius: 4px; background: var(--accent); transition: width 0.3s; }
-.meter i.over { background: var(--warn); }
-.meter b { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: var(--fg); }
-.scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
 .preview { display: block; width: 100%; max-width: 240px; background: #000; border-radius: 6px; }
 .part-error { color: var(--bad); }
 .empty { margin: 0; color: var(--muted); }
@@ -175,11 +170,11 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
       <div class="mode-grid">
         <label class="mode">
           <input type="radio" name="mode" value="copy" checked>
-          <span><strong>Split only</strong><small>Cuts at keyframes with no re-encoding, so quality stays exactly as recorded.</small></span>
+          <span><strong>Split only (Lossless)</strong><small>Cuts at keyframes with zero re-encoding. Quality stays exactly as recorded.</small></span>
         </label>
         <label class="mode">
           <input type="radio" name="mode" value="encode">
-          <span><strong>Re-encode</strong><small>Converts to H.264 at a set bitrate. Note: Browser encoders are not as good as native phone apps. Use a higher bitrate for best results.</small></span>
+          <span><strong>Re-encode (Compress)</strong><small>Converts to H.264 to shrink file size. Warning: Web browsers have weak encoders. Keep it on 720p for best results.</small></span>
         </label>
       </div>
     </fieldset>
@@ -197,14 +192,14 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
       <div class="field" id="fRes" hidden>
         <label for="res">Resolution</label>
         <select id="res">
-          <option value="1920" selected>1080p, 1920 px long edge</option>
-          <option value="1280">720p, 1280 px long edge</option>
+          <option value="1280" selected>720p, 1280 px long edge</option>
+          <option value="1920">1080p, 1920 px long edge</option>
         </select>
-        <p class="hint">Downscaling can sometimes cause blur.</p>
+        <p class="hint">720p looks much sharper than 1080p in web browsers.</p>
       </div>
       <div class="field" id="fBitrate" hidden>
-        <div class="range-row"><label for="bitrate">Video bitrate</label><output id="bitrateOut" for="bitrate" class="mono">6.0 Mbps</output></div>
-        <input type="range" id="bitrate" min="2" max="15" step="0.5" value="6">
+        <div class="range-row"><label for="bitrate">Video bitrate</label><output id="bitrateOut" for="bitrate" class="mono">5.0 Mbps</output></div>
+        <input type="range" id="bitrate" min="2" max="10" step="0.5" value="5">
         <p class="hint">Higher is clearer. If the file exceeds 16MB, lower this.</p>
       </div>
     </div>
@@ -231,10 +226,8 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
 
   const LIB_URL = "https://cdn.jsdelivr.net/npm/mediabunny@1.61.6/dist/bundles/mediabunny.min.mjs";
   const AUDIO_BPS = 128000;
-  const SCALE_MB = 16;
-  const MAX_BOOST = 3;
   const TOL = 0.25; 
-  const EXAMPLE = { name: "Example clip", size: null, duration: 95, dw: 1080, dh: 1920, fps: 30, codec: "hevc", hdr: false, hasAudio: true, colorSpace: null, example: true };
+  const EXAMPLE = { name: "Example clip", size: null, duration: 95, dw: 1080, dh: 1920, fps: 30, codec: "hevc", hdr: false, hasAudio: true, example: true };
 
   const $ = (id) => document.getElementById(id);
   const el = (tag, cls, text) => {
@@ -253,7 +246,6 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
   let input = null;       
   let src = null;         
   let cutsState = null;   
-  let lastPlan = null;
   let running = false;
   let canceled = false;
   let current = null;     
@@ -278,15 +270,10 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
     return {
       mode: "encode",
       parts, partSec, sliceSec, audioBps, videoBps, w, h, estBytes,
-      over: estBytes > SCALE_MB * 1e6,
+      over: estBytes > 16e6,
       downscaled: scale < 1,
       frameRate: s.fps > 31 ? 30 : null,
     };
-  }
-
-  function nextBoost(actualBps, targetBps, boost) {
-    if (actualBps >= targetBps * 0.8 || boost >= MAX_BOOST) return null;
-    return Math.min(MAX_BOOST, boost * (targetBps / actualBps));
   }
 
   function cutKey(s, set) { return s.name + "|" + s.duration + "|" + set.partSec; }
@@ -323,19 +310,6 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
     return cuts;
   }
 
-  async function probeColorSpace(vt) {
-    try {
-      const sink = new MB.VideoSampleSink(vt);
-      const sample = await sink.getSample(0);
-      if (!sample) return null;
-      const frame = sample.toVideoFrame();
-      const cs = frame.colorSpace || {};
-      const info = { fullRange: cs.fullRange, primaries: cs.primaries, transfer: cs.transfer, matrix: cs.matrix };
-      frame.close();
-      return info;
-    } catch (e) { return null; }
-  }
-
   async function refreshCuts() {
     if (!input || !src) { cutsState = null; return; }
     const key = cutKey(src, readSettings());
@@ -350,7 +324,7 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
     $("bitrateOut").textContent = set.bitrateMbps.toFixed(1) + " Mbps";
     $("fRes").hidden = copy;
     $("fBitrate").hidden = copy;
-    $("go").textContent = copy ? "Split video" : "Compress";
+    $("go").textContent = copy ? "Export video" : "Compress";
 
     const plan = $("plan");
     plan.textContent = "";
@@ -368,20 +342,27 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
       row("Quality", "same as source");
       row("Size per part", p.estBytes != null ? "≈ " + fmtMB(p.estBytes) : "unknown");
       if (s.example) note("info", "Showing an example 1:35 portrait clip. Choose a video to plan with yours.");
-      if (p.single && !s.example) note("warn", "This video already fits in one part. There is nothing to cut, so post the original from your gallery.");
-      if (!p.single) note("info", "Parts are cut at keyframes, so each is a little shorter than the length you picked. At most one frame is lost at each cut.");
+      
+      if (p.single && !s.example) {
+        note("info", "This video is under 30 seconds. Pressing 'Export' will save a perfect 1:1 copy to your device without any quality loss.");
+      }
     } else {
       p = computePlan(s, set);
       row("Parts", p.parts === 1 ? "1 × " + mmss(p.sliceSec) : p.parts + " × " + mmss(p.sliceSec));
       row("Output frame", p.w + "×" + p.h);
       row("Video bitrate", fmtMbps(p.videoBps));
       row("Estimated size", "≈ " + fmtMB(p.estBytes) + " per part");
+      
       if (s.example) note("info", "Showing an example 1:35 portrait clip. Choose a video to plan with yours.");
+      
+      if (s.duration <= 30 && !s.example) {
+        note("bad", "Warning: Your video is already under 30 seconds. Re-encoding will reduce quality. If your file is under 16MB, use 'Split only' to save a perfect lossless copy.");
+      }
+
       if (s.hdr) note("warn", "HDR video detected. Browsers convert HDR to normal colour imperfectly, so colours can look dull. For the best result, turn off HDR Video in Settings, Camera, Record Video, and record again.");
       if (p.over) note("warn", "Each part is estimated above 16 MB, the usual WhatsApp video limit. Lower the bitrate or part length if the upload fails.");
       if (p.parts > 12) note("warn", "This makes " + p.parts + " parts. Check the part length.");
     }
-    lastPlan = p;
     syncButtons();
     return p;
   }
@@ -410,8 +391,7 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
   function syncButtons() {
     const copy = getMode() === "copy";
     const ready = copy ? env.lib === true : env.ready;
-    const blockedSingle = copy && !!src && !!lastPlan && lastPlan.single;
-    $("go").disabled = !(src && ready && !running && !blockedSingle);
+    $("go").disabled = !(src && ready && !running);
     $("stop").hidden = !running;
     $("file").disabled = running;
     ["res", "part", "bitrate"].forEach((id) => { $(id).disabled = running; });
@@ -422,7 +402,6 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
     else if (env.lib === false) hint = "The encoder library could not load. Check your connection and reload.";
     else if (!copy && !env.ready) hint = "This browser cannot encode H.264 video. Use Split only, or try Chrome, Edge or Safari.";
     else if (!src) hint = "Choose a video to start.";
-    else if (blockedSingle) hint = "Nothing to cut.";
     $("goHint").textContent = hint;
   }
 
@@ -484,9 +463,14 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
       try { fps = (await vt.computePacketStats(120)).averagePacketRate; } catch (e) { /* unknown */ }
       let hdr = false;
       try { hdr = await vt.hasHighDynamicRange(); } catch (e) { /* standard */ }
-      const colorSpace = await probeColorSpace(vt);
       input = inp;
-      src = { name: file.name, size: file.size, duration, dw: vt.displayWidth, dh: vt.displayHeight, fps, codec: vt.codec, hdr, hasAudio: !!at, colorSpace, example: false };
+      src = { name: file.name, size: file.size, duration, dw: vt.displayWidth, dh: vt.displayHeight, fps, codec: vt.codec, hdr, hasAudio: !!at, example: false };
+      
+      // AUTO-SELECT SPLIT ONLY FOR SHORT VIDEOS
+      if (duration <= 30) {
+        document.querySelector('input[name="mode"][value="copy"]').checked = true;
+      }
+
       await refreshCuts();
     } catch (e) {
       showSrcMsg("Could not read this file. " + (e && e.message ? e.message : "Try an MP4 or MOV."));
@@ -530,17 +514,7 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
     if (p.mode === "copy") {
       row.status.textContent = sizeMB.toFixed(1) + " MB · " + avg + " · " + p.w + "×" + p.h + " · not re-encoded";
     } else {
-      const plannedMB = p.estBytes / 1e6;
-      row.status.textContent = sizeMB.toFixed(1) + " MB · " + avg + " (asked " + fmtMbps(p.videoBps + p.audioBps) + ") · " + p.w + "×" + p.h + (row.retried ? " · retried at a higher bitrate" : "");
-      const meter = el("div", "meter");
-      const fill = el("i", sizeMB > SCALE_MB ? "over" : "");
-      fill.style.width = Math.min(100, (sizeMB / SCALE_MB) * 100) + "%";
-      const tick = el("b");
-      tick.style.left = Math.min(100, (plannedMB / SCALE_MB) * 100) + "%";
-      meter.append(fill, tick);
-      const scale = el("div", "scale mono");
-      scale.append(el("span", null, "0"), el("span", null, "tick = planned " + plannedMB.toFixed(1) + " MB"), el("span", null, SCALE_MB + " MB"));
-      row.li.append(meter, scale);
+      row.status.textContent = sizeMB.toFixed(1) + " MB · " + avg + " · " + p.w + "×" + p.h;
     }
 
     const name = base + "-status" + (p.parts > 1 ? "-p" + (i + 1) : "") + ".mp4";
@@ -620,15 +594,14 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
         throw new Error("This video's format cannot be copied into an MP4 without re-encoding" + (why ? " (" + why + ")" : "") + ". Try Re-encode.");
       }
     } else {
-      // Reverted to Software Encoding. Fixed stretch bug with 'contain'. Higher default bitrate.
       const video = {
-        codec: "avc", 
+        codec: "avc1.640028", 
         width: p.w, 
         height: p.h, 
-        fit: "contain", 
+        fit: "fill", 
         quality: new MB.Quality({ 
-          bitrate: Math.round(p.videoBps * (row.boost || 1)), 
-          bitrateMode: "variable" 
+          bitrate: Math.round(p.videoBps), 
+          bitrateMode: "constant" 
         }),
         keyFrameInterval: 2, 
         forceTranscode: true
@@ -642,7 +615,7 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
       }
     }
     current = conv;
-    conv.onProgress = (frac) => { row.prog.value = frac; row.status.textContent = (p.mode === "copy" ? "Cutting " : "Encoding ") + Math.round(frac * 100) + "%"; };
+    conv.onProgress = (frac) => { row.prog.value = frac; row.status.textContent = (p.mode === "copy" ? "Exporting " : "Encoding ") + Math.round(frac * 100) + "%"; };
     await conv.execute();
     current = null;
     return new Blob([output.target.buffer], { type: "video/mp4" });
@@ -675,7 +648,6 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
 
     const base = (src.name.replace(/\.[^.]+$/, "").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-").slice(0, 40)) || "video";
     let done = 0;
-    let boost = 1; 
     for (let i = 0; i < p.parts; i++) {
       const start = bounds ? bounds[i] : i * (Number.isFinite(p.partSec) ? p.partSec : 0);
       const end = bounds ? bounds[i + 1] : Number.isFinite(p.partSec) ? Math.min((i + 1) * p.partSec, src.duration) : src.duration;
@@ -683,18 +655,7 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
       row.openStart = !!bounds && i === 0;
       row.openEnd = !!bounds && i === p.parts - 1;
       try {
-        row.boost = boost;
         let blob = await convertPart(p, row);
-        if (p.mode === "encode" && !canceled) {
-          const next = nextBoost((blob.size * 8) / Math.max(0.1, end - start), p.videoBps + p.audioBps, boost);
-          if (next) {
-            row.status.textContent = "The encoder gave less than asked for. Retrying at a higher bitrate.";
-            row.prog.value = 0;
-            row.boost = next;
-            const again = await convertPart(p, row);
-            if (again.size > blob.size * 1.05) { blob = again; boost = next; row.retried = true; }
-          }
-        }
         showDone(row, blob, p, i, base);
         done++;
       } catch (e) {
