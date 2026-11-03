@@ -1,0 +1,764 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Crisp Status</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one work column. Source, Settings and Output stack in the order you use them. Split-only is the default method; the re-encode output meters share one 0 to 16 MB scale so parts compare at a glance. */
+:root {
+  --bg: #EBEEF2;
+  --surface: #FFFFFF;
+  --line: #D5DAE1;
+  --track: #E2E6EC;
+  --fg: #161B24;
+  --muted: #5B6574;
+  --accent: #2750D8;
+  --accent-fg: #FFFFFF;
+  --accent-soft: #E3EAFB;
+  --good: #18794E;
+  --warn: #9A6200;
+  --bad: #B42C2C;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #10141B;
+    --surface: #181E28;
+    --line: #2B3442;
+    --track: #252D3A;
+    --fg: #E7EBF2;
+    --muted: #98A3B5;
+    --accent: #7B9CFF;
+    --accent-fg: #0B1020;
+    --accent-soft: #1C2745;
+    --good: #4CC38A;
+    --warn: #E3B04B;
+    --bad: #FF8A8A;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #10141B;
+  --surface: #181E28;
+  --line: #2B3442;
+  --track: #252D3A;
+  --fg: #E7EBF2;
+  --muted: #98A3B5;
+  --accent: #7B9CFF;
+  --accent-fg: #0B1020;
+  --accent-soft: #1C2745;
+  --good: #4CC38A;
+  --warn: #E3B04B;
+  --bad: #FF8A8A;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 56px;
+}
+.page { max-width: 720px; margin-inline: auto; display: grid; gap: 18px; }
+.mono { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+
+header h1 { margin: 0; font-size: 1.9rem; line-height: 1.1; font-weight: 600; letter-spacing: -0.015em; text-wrap: balance; }
+header .lede { margin: 8px 0 0; max-width: 58ch; color: var(--muted); }
+.env { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 14px 0 0; padding: 0; list-style: none; font-family: var(--font-data); font-size: 12px; color: var(--muted); }
+.env li::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 7px; background: var(--muted); }
+.env li.ok::before { background: var(--good); }
+.env li.no::before { background: var(--bad); }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: grid; gap: 16px; min-width: 0; }
+.panel h2 { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); }
+
+/* source */
+.drop { display: grid; gap: 2px; justify-items: start; padding: 16px; border: 1.5px dashed var(--line); border-radius: 8px; cursor: pointer; background: var(--bg); transition: border-color 0.15s, background 0.15s; }
+.drop:hover, .drop.over, .drop:focus-within { border-color: var(--accent); background: var(--accent-soft); }
+.drop strong { font-weight: 600; }
+.drop span { color: var(--muted); font-size: 13px; }
+.drop input { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 14px 16px; margin: 0; }
+.facts div { min-width: 0; }
+.facts dt { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.facts dd { margin: 2px 0 0; font-family: var(--font-data); font-size: 14px; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.tag { display: inline-block; font-family: var(--font-data); font-size: 11px; padding: 1px 7px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); margin-left: 6px; vertical-align: 1px; }
+
+/* settings */
+.modes { border: 0; padding: 0; margin: 0; min-width: 0; }
+.modes legend { padding: 0; margin-bottom: 8px; font-weight: 500; font-size: 14px; }
+.mode-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.mode { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; min-width: 0; }
+.mode:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.mode:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mode input { margin: 4px 0 0; accent-color: var(--accent); flex: none; }
+.mode strong { display: block; font-weight: 600; }
+.mode small { display: block; color: var(--muted); font-size: 13px; line-height: 1.4; margin-top: 2px; }
+.controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; }
+.field { display: grid; gap: 6px; min-width: 0; align-content: start; }
+.field label, .field .label { font-weight: 500; font-size: 14px; }
+select { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; width: 100%; }
+input[type="range"] { width: 100%; accent-color: var(--accent); margin: 6px 0 0; }
+.range-row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.range-row output { font-family: var(--font-data); font-size: 14px; }
+.hint { color: var(--muted); font-size: 12.5px; margin: 0; }
+.plan { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 14px 16px; margin: 0; padding-top: 16px; border-top: 1px solid var(--line); }
+.plan div { min-width: 0; }
+.plan dt { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.plan dd { margin: 2px 0 0; font-family: var(--font-data); font-size: 15px; font-variant-numeric: tabular-nums; }
+.notes { display: grid; gap: 6px; margin: 0; }
+.notes p { margin: 0; font-size: 13.5px; }
+.notes .warn { color: var(--warn); }
+.notes .bad { color: var(--bad); }
+.notes .info { color: var(--muted); }
+
+/* actions */
+.actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.btn { font: inherit; font-weight: 500; border-radius: 8px; padding: 10px 18px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); cursor: pointer; }
+.btn:hover:not(:disabled) { border-color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+.btn.primary:hover:not(:disabled) { filter: brightness(1.06); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn.small { padding: 7px 14px; font-size: 14px; }
+:is(.btn, select, input, .drop):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* output */
+.parts { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.part { display: grid; gap: 10px; padding: 16px 0; border-top: 1px solid var(--line); min-width: 0; }
+.part:first-child { border-top: 0; padding-top: 0; }
+.part:last-child { padding-bottom: 0; }
+.part-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 12px; }
+.part-head h3 { margin: 0; font-size: 15px; font-weight: 600; }
+.part-status { margin: 0; font-size: 13px; overflow-wrap: anywhere; }
+progress { width: 100%; height: 8px; accent-color: var(--accent); }
+.meter { position: relative; height: 8px; background: var(--track); border-radius: 4px; margin-top: 4px; }
+.meter i { display: block; height: 100%; border-radius: 4px; background: var(--accent); transition: width 0.3s; }
+.meter i.over { background: var(--warn); }
+.meter b { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: var(--fg); }
+.scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
+.preview { display: block; width: 100%; max-width: 240px; background: #000; border-radius: 6px; }
+.part-error { color: var(--bad); }
+.empty { margin: 0; color: var(--muted); }
+.summary { margin: 0; font-size: 14px; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="page">
+  <header>
+    <h1>Crisp Status</h1>
+    <p class="lede">Cuts your video into status-length parts, or re-encodes it at a set bitrate. Everything happens on this device and nothing is uploaded.</p>
+    <ul class="env" id="env" aria-label="Encoder support"><li>Checking encoder support</li></ul>
+  </header>
+
+  <section class="panel" aria-labelledby="h-src">
+    <h2 id="h-src">Source</h2>
+    <label class="drop" id="drop" for="file">
+      <strong>Choose a video</strong>
+      <span>or drop a file here. It stays on this device.</span>
+      <input type="file" id="file" accept="video/*">
+    </label>
+    <p class="notes" id="srcMsg" role="alert" hidden></p>
+    <dl class="facts" id="facts"></dl>
+  </section>
+
+  <section class="panel" aria-labelledby="h-set">
+    <h2 id="h-set">Settings</h2>
+    <fieldset class="modes" id="modes">
+      <legend>Method</legend>
+      <div class="mode-grid">
+        <label class="mode">
+          <input type="radio" name="mode" value="copy" checked>
+          <span><strong>Split only</strong><small>Cuts at keyframes with no re-encoding, so quality stays exactly as recorded.</small></span>
+        </label>
+        <label class="mode">
+          <input type="radio" name="mode" value="encode">
+          <span><strong>Re-encode</strong><small>Converts to H.264 at a set bitrate, the way PureStatus's output is built. An earlier 720p version looked soft and dull on an iPhone.</small></span>
+        </label>
+      </div>
+    </fieldset>
+    <div class="controls">
+      <div class="field" id="fPart">
+        <label for="part">Part length</label>
+        <select id="part">
+          <option value="30" selected>30 seconds</option>
+          <option value="60">60 seconds</option>
+          <option value="90">90 seconds</option>
+          <option value="0">Keep whole video</option>
+        </select>
+        <p class="hint">Status clips are cut to this length, one file per part.</p>
+      </div>
+      <div class="field" id="fRes" hidden>
+        <label for="res">Resolution</label>
+        <select id="res">
+          <option value="1920" selected>1080p, 1920 px long edge</option>
+          <option value="1280">720p, 1280 px long edge</option>
+        </select>
+        <p class="hint">PureStatus kept 1080p on a test clip.</p>
+      </div>
+      <div class="field" id="fBitrate" hidden>
+        <div class="range-row"><label for="bitrate">Video bitrate</label><output id="bitrateOut" for="bitrate" class="mono">4.0 Mbps</output></div>
+        <input type="range" id="bitrate" min="1.5" max="10" step="0.1" value="4">
+        <p class="hint">PureStatus gave about 3.8 Mbps on one test clip.</p>
+      </div>
+    </div>
+    <dl class="plan" id="plan"></dl>
+    <div class="notes" id="notes"></div>
+    <div class="actions">
+      <button type="button" class="btn primary" id="go" disabled>Split video</button>
+      <button type="button" class="btn" id="stop" hidden>Cancel</button>
+      <span class="hint" id="goHint">Choose a video to start.</span>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="h-out">
+    <h2 id="h-out">Output</h2>
+    <p class="empty" id="empty">Parts appear here, each with a preview and a Save button.</p>
+    <ol class="parts" id="parts"></ol>
+    <p class="summary" id="summary" aria-live="polite" hidden></p>
+  </section>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const LIB_URL = "https://cdn.jsdelivr.net/npm/mediabunny@1.61.6/dist/bundles/mediabunny.min.mjs";
+  const AUDIO_BPS = 128000;
+  const SCALE_MB = 16;
+  const MAX_BOOST = 3;
+  const TOL = 0.25; // seconds a clip may run past the part length before it counts as another part
+  const EXAMPLE = { name: "Example clip", size: null, duration: 95, dw: 1080, dh: 1920, fps: 30, codec: "hevc", hdr: false, hasAudio: true, colorSpace: null, example: true };
+
+  const $ = (id) => document.getElementById(id);
+  const el = (tag, cls, text) => {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  };
+  const mmss = (s) => { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); };
+  const fmtMB = (bytes) => (bytes / 1e6).toFixed(1) + " MB";
+  const fmtMbps = (bps) => (bps / 1e6).toFixed(2) + " Mbps";
+  const getMode = () => (document.querySelector('input[name="mode"]:checked') || {}).value || "copy";
+
+  const env = { lib: null, webcodecs: false, h264: false, aac: false, ready: false };
+  let MB = null;          // mediabunny namespace once loaded
+  let dl = null;          // downloads capability, null when this view has none
+  let input = null;       // mediabunny Input for the chosen file
+  let src = null;         // facts about the chosen file
+  let cutsState = null;   // keyframe cut points for the current file and part length
+  let lastPlan = null;
+  let running = false;
+  let canceled = false;
+  let current = null;     // running Conversion
+  let wakeLock = null;
+  let urls = [];
+
+  /* ---------- planning ---------- */
+
+  function readSettings() {
+    return { mode: getMode(), longEdge: +$("res").value, partSec: +$("part").value, bitrateMbps: +$("bitrate").value };
+  }
+
+  function computePlan(s, set) {
+    const partSec = set.partSec > 0 ? set.partSec : Infinity;
+    const parts = Number.isFinite(partSec) ? Math.max(1, Math.ceil((s.duration - TOL) / partSec)) : 1;
+    const sliceSec = Math.min(partSec, s.duration);
+    const audioBps = s.hasAudio ? AUDIO_BPS : 0;
+    const videoBps = Math.round(set.bitrateMbps * 1e6);
+    const scale = Math.min(1, set.longEdge / Math.max(s.dw, s.dh));
+    const even = (n) => Math.max(2, Math.round(n / 2) * 2);
+    const w = even(s.dw * scale);
+    const h = even(s.dh * scale);
+    const estBytes = ((videoBps + audioBps) * sliceSec) / 8 * 1.02;
+    return {
+      mode: "encode",
+      parts, partSec, sliceSec, audioBps, videoBps, w, h, estBytes,
+      over: estBytes > SCALE_MB * 1e6,
+      downscaled: scale < 1,
+      frameRate: s.fps > 31 ? 30 : null,
+    };
+  }
+
+  // When the device's encoder returns well under the bitrate asked for, ask for more, up to MAX_BOOST times the plan.
+  function nextBoost(actualBps, targetBps, boost) {
+    if (actualBps >= targetBps * 0.8 || boost >= MAX_BOOST) return null;
+    return Math.min(MAX_BOOST, boost * (targetBps / actualBps));
+  }
+
+  function cutKey(s, set) { return s.name + "|" + s.duration + "|" + set.partSec; }
+
+  function computeCopyPlan(s, set) {
+    const partSec = set.partSec > 0 ? set.partSec : Infinity;
+    const single = !Number.isFinite(partSec) || s.duration <= partSec + TOL;
+    const cuts = cutsState && !s.example && cutsState.key === cutKey(s, set) ? cutsState.cuts : null;
+    const parts = single ? 1 : cuts ? cuts.length - 1 : Math.ceil(s.duration / partSec);
+    let longest = Math.min(partSec, s.duration);
+    if (cuts) longest = Math.max(...cuts.slice(1).map((c, i) => c - cuts[i]));
+    const estBytes = s.size != null ? (s.size / s.duration) * longest : null;
+    return { mode: "copy", single, parts, partSec, longest, estBytes, exact: !!cuts || single };
+  }
+
+  async function computeCuts() {
+    const set = readSettings();
+    const partSec = set.partSec > 0 ? set.partSec : Infinity;
+    if (!Number.isFinite(partSec) || src.duration <= partSec + TOL) return [0, src.duration];
+    const vt = await input.getPrimaryVideoTrack();
+    const cuts = [0];
+    let start = 0;
+    while (src.duration - start > partSec + TOL) {
+      const target = start + partSec;
+      let t = target;
+      try {
+        const kp = await vt.getKeyPacket(target);
+        if (kp && kp.timestamp > start + 0.5) t = kp.timestamp;
+      } catch (e) { /* fall back to the plain cut point */ }
+      cuts.push(t);
+      start = t;
+    }
+    cuts.push(src.duration);
+    return cuts;
+  }
+
+  // Read the first decoded frame's colour metadata so the UI can warn about full-range sources.
+  async function probeColorSpace(vt) {
+    try {
+      const sink = new MB.VideoSampleSink(vt);
+      const sample = await sink.getSample(0);
+      if (!sample) return null;
+      const frame = sample.toVideoFrame();
+      const cs = frame.colorSpace || {};
+      const info = { fullRange: cs.fullRange, primaries: cs.primaries, transfer: cs.transfer, matrix: cs.matrix };
+      frame.close();
+      return info;
+    } catch (e) { return null; }
+  }
+
+  async function refreshCuts() {
+    if (!input || !src) { cutsState = null; return; }
+    const key = cutKey(src, readSettings());
+    if (cutsState && cutsState.key === key) return;
+    try { cutsState = { key, cuts: await computeCuts() }; } catch (e) { cutsState = null; }
+  }
+
+  function renderPlan() {
+    const s = src || EXAMPLE;
+    const set = readSettings();
+    const copy = set.mode === "copy";
+    $("bitrateOut").textContent = set.bitrateMbps.toFixed(1) + " Mbps";
+    $("fRes").hidden = copy;
+    $("fBitrate").hidden = copy;
+    $("go").textContent = copy ? "Split video" : "Compress";
+
+    const plan = $("plan");
+    plan.textContent = "";
+    const row = (k, v) => { const d = el("div"); d.append(el("dt", null, k), el("dd", null, v)); plan.append(d); };
+    const notes = $("notes");
+    notes.textContent = "";
+    const note = (cls, text) => notes.append(el("p", cls, text));
+
+    let p;
+    if (copy) {
+      p = computeCopyPlan(s, set);
+      const lenLabel = mmss(set.partSec > 0 ? set.partSec : s.duration);
+      row("Parts", p.single ? "1, no cut needed" : (p.exact ? "" : "about ") + p.parts + " × up to " + lenLabel);
+      row("Re-encoding", "none");
+      row("Quality", "same as source");
+      row("Size per part", p.estBytes != null ? "≈ " + fmtMB(p.estBytes) : "unknown");
+      if (s.example) note("info", "Showing an example 1:35 portrait clip. Choose a video to plan with yours.");
+      if (p.single && !s.example) note("warn", "This video already fits in one part. There is nothing to cut, so post the original from your gallery.");
+      if (!p.single) note("info", "Parts are cut at keyframes, so each is a little shorter than the length you picked. At most one frame is lost at each cut.");
+      note("info", "This only helps with videos longer than the status limit. Under 30 seconds, posting the original is the same thing.");
+      if (p.estBytes != null && p.estBytes > 150e6) note("warn", "Parts this large (≈ " + fmtMB(p.estBytes) + ") may run out of memory on a phone.");
+    } else {
+      p = computePlan(s, set);
+      row("Parts", p.parts === 1 ? "1 × " + mmss(p.sliceSec) : p.parts + " × " + mmss(p.sliceSec));
+      row("Output frame", p.w + "×" + p.h);
+      row("Video bitrate", fmtMbps(p.videoBps));
+      row("Estimated size", "≈ " + fmtMB(p.estBytes) + " per part");
+      if (s.example) note("info", "Showing an example 1:35 portrait clip. Choose a video to plan with yours.");
+      if (s.hdr) note("warn", "HDR video detected. Browsers convert HDR to normal colour imperfectly, so colours can look dull. For the best result, turn off HDR Video in Settings, Camera, Record Video, and record again.");
+      if (s.colorSpace && s.colorSpace.fullRange === true && !s.hdr) note("warn", "Source is full-range. Chrome's software encoder sometimes mislabels these as limited-range, which looks washed out. Hardware acceleration is on to avoid this — if the output still looks dull, re-export the source as limited-range.");
+      if (p.over) note("warn", "Each part is estimated above 16 MB, the usual WhatsApp video limit. Lower the bitrate or part length if the upload fails.");
+      if (!p.downscaled && !s.example) note("info", "The source is already at or below this resolution, so it keeps its size.");
+      if (p.parts > 12) note("warn", "This makes " + p.parts + " parts. Check the part length.");
+      if (env.lib && !env.aac && s.hasAudio) note("warn", "AAC encoding is not available in this browser. The original audio is kept where possible.");
+    }
+    lastPlan = p;
+    syncButtons();
+    return p;
+  }
+
+  function renderFacts() {
+    const s = src || EXAMPLE;
+    const facts = $("facts");
+    facts.textContent = "";
+    const add = (k, v, tag) => {
+      const d = el("div");
+      const dd = el("dd", null, v);
+      if (tag) dd.append(el("span", "tag", tag));
+      d.append(el("dt", null, k), dd);
+      facts.append(d);
+    };
+    add("File", s.name, s.example ? "example" : null);
+    add("Length", mmss(s.duration));
+    add("Frame", s.dw + "×" + s.dh);
+    add("Frame rate", s.fps ? Math.round(s.fps) + " fps" : "unknown");
+    add("Video codec", s.codec || "unknown");
+    add("Dynamic range", s.hdr ? "HDR" : "standard");
+    if (s.colorSpace) {
+      const cs = s.colorSpace;
+      const range = cs.fullRange === true ? "full" : cs.fullRange === false ? "limited" : "unknown";
+      add("Colour range", range + (cs.transfer ? " · " + cs.transfer : ""));
+    }
+    add("Audio", s.hasAudio ? "yes" : "none");
+    add("Size", s.size != null ? fmtMB(s.size) : "not set");
+  }
+
+  function syncButtons() {
+    const copy = getMode() === "copy";
+    const ready = copy ? env.lib === true : env.ready;
+    const blockedSingle = copy && !!src && !!lastPlan && lastPlan.single;
+    $("go").disabled = !(src && ready && !running && !blockedSingle);
+    $("stop").hidden = !running;
+    $("file").disabled = running;
+    ["res", "part", "bitrate"].forEach((id) => { $(id).disabled = running; });
+    document.querySelectorAll('input[name="mode"]').forEach((r) => { r.disabled = running; });
+    let hint = "";
+    if (running) hint = "Keep this page open while it works.";
+    else if (env.lib === null) hint = "Loading the encoder.";
+    else if (env.lib === false) hint = "The encoder library could not load. Check your connection and reload.";
+    else if (!copy && !env.ready) hint = "This browser cannot encode H.264 video. Use Split only, or try Chrome, Edge or Safari.";
+    else if (!src) hint = "Choose a video to start.";
+    else if (blockedSingle) hint = "Nothing to cut.";
+    $("goHint").textContent = hint;
+  }
+
+  /* ---------- environment ---------- */
+
+  function renderEnv() {
+    const list = $("env");
+    list.textContent = "";
+    const chip = (label, ok) => list.append(el("li", ok ? "ok" : "no", label + (ok ? ": yes" : ": no")));
+    chip("Encoder library", env.lib === true);
+    chip("WebCodecs", env.webcodecs);
+    chip("H.264 encode", env.h264);
+    chip("AAC encode", env.aac);
+  }
+
+  async function initEnv() {
+    env.webcodecs = typeof window.VideoEncoder === "function" && typeof window.VideoDecoder === "function";
+    try {
+      MB = await import(LIB_URL);
+      env.lib = true;
+    } catch (e) {
+      env.lib = false;
+    }
+    if (env.lib && env.webcodecs) {
+      env.h264 = await MB.canEncodeVideo("avc", { width: 1280, height: 720, bitrate: 2e6 }).catch(() => false);
+      env.aac = await MB.canEncodeAudio("aac", { numberOfChannels: 2, sampleRate: 48000, bitrate: AUDIO_BPS }).catch(() => false);
+    }
+    env.ready = !!(env.lib && env.webcodecs && env.h264);
+    renderEnv();
+    renderPlan();
+  }
+
+  async function initDownloads() {
+    try {
+      dl = window.claude && window.claude.use ? await window.claude.use("downloads") : null;
+    } catch (e) {
+      dl = null;
+    }
+  }
+
+  /* ---------- source ---------- */
+
+  function showSrcMsg(text) {
+    const m = $("srcMsg");
+    m.textContent = "";
+    if (text) m.append(el("span", "bad", text));
+    m.hidden = !text;
+  }
+
+  function disposeInput() {
+    if (input) { try { input.dispose(); } catch (e) { /* already gone */ } }
+    input = null;
+  }
+
+  async function loadFile(file) {
+    if (!file || running) return;
+    if (!MB) { showSrcMsg("The encoder library has not loaded yet. Wait a moment and try again."); return; }
+    showSrcMsg("");
+    clearOutput();
+    disposeInput();
+    src = null;
+    cutsState = null;
+    $("goHint").textContent = "Reading the file.";
+    try {
+      const inp = new MB.Input({ source: new MB.BlobSource(file), formats: MB.ALL_FORMATS });
+      const vt = await inp.getPrimaryVideoTrack();
+      if (!vt) throw new Error("No video track found in this file.");
+      const at = await inp.getPrimaryAudioTrack();
+      const duration = await inp.computeDuration();
+      let fps = 0;
+      try { fps = (await vt.computePacketStats(120)).averagePacketRate; } catch (e) { /* leave unknown */ }
+      let hdr = false;
+      try { hdr = await vt.hasHighDynamicRange(); } catch (e) { /* leave standard */ }
+      const colorSpace = await probeColorSpace(vt);
+      input = inp;
+      src = { name: file.name, size: file.size, duration, dw: vt.displayWidth, dh: vt.displayHeight, fps, codec: vt.codec, hdr, hasAudio: !!at, colorSpace, example: false };
+      await refreshCuts();
+    } catch (e) {
+      showSrcMsg("Could not read this file. " + (e && e.message ? e.message : "Try an MP4 or MOV."));
+    }
+    renderFacts();
+    renderPlan();
+  }
+
+  /* ---------- output ---------- */
+
+  function clearOutput() {
+    urls.forEach((u) => URL.revokeObjectURL(u));
+    urls = [];
+    $("parts").textContent = "";
+    $("empty").hidden = false;
+    $("summary").hidden = true;
+  }
+
+  function addPartRow(i, p, start, end) {
+    $("empty").hidden = true;
+    const li = el("li", "part");
+    const head = el("div", "part-head");
+    head.append(
+      el("h3", null, p.parts > 1 ? "Part " + (i + 1) + " of " + p.parts : p.mode === "copy" ? "Video" : "Compressed video"),
+      el("span", "mono muted small", mmss(start) + " to " + mmss(end))
+    );
+    const prog = document.createElement("progress");
+    prog.max = 1;
+    prog.value = 0;
+    prog.setAttribute("aria-label", "Progress, part " + (i + 1));
+    const status = el("p", "part-status mono muted", "Waiting");
+    li.append(head, prog, status);
+    $("parts").append(li);
+    return { li, prog, status, start, end };
+  }
+
+  function showDone(row, blob, p, i, base) {
+    row.prog.remove();
+    const sizeMB = blob.size / 1e6;
+    const dur = Math.max(0.1, row.end - row.start);
+    const avg = fmtMbps((blob.size * 8) / dur) + " average";
+
+    if (p.mode === "copy") {
+      row.status.textContent = sizeMB.toFixed(1) + " MB · " + avg + " · " + p.w + "×" + p.h + " · not re-encoded";
+    } else {
+      const plannedMB = p.estBytes / 1e6;
+      row.status.textContent = sizeMB.toFixed(1) + " MB · " + avg + " (asked " + fmtMbps(p.videoBps + p.audioBps) + ") · " + p.w + "×" + p.h + (row.retried ? " · retried at a higher bitrate" : "");
+      const meter = el("div", "meter");
+      meter.setAttribute("role", "img");
+      meter.setAttribute("aria-label", sizeMB.toFixed(1) + " megabytes on a scale to " + SCALE_MB + "; planned " + plannedMB.toFixed(1));
+      const fill = el("i", sizeMB > SCALE_MB ? "over" : "");
+      fill.style.width = Math.min(100, (sizeMB / SCALE_MB) * 100) + "%";
+      const tick = el("b");
+      tick.style.left = Math.min(100, (plannedMB / SCALE_MB) * 100) + "%";
+      meter.append(fill, tick);
+      const scale = el("div", "scale mono");
+      scale.append(el("span", null, "0"), el("span", null, "tick = planned " + plannedMB.toFixed(1) + " MB"), el("span", null, SCALE_MB + " MB"));
+      row.li.append(meter, scale);
+      if (sizeMB < plannedMB * 0.8) {
+        row.li.append(el("p", "hint", "Your device's encoder gave less than the bitrate asked for. That is normal for simple pictures. If it looks soft, tell me the size and I will adjust."));
+      }
+    }
+
+    const name = base + "-status" + (p.parts > 1 ? "-p" + (i + 1) : "") + ".mp4";
+    const actions = el("div", "actions");
+    if (dl) {
+      const save = el("button", "btn small", "Save " + name);
+      save.type = "button";
+      const msg = el("span", "hint");
+      msg.setAttribute("aria-live", "polite");
+      save.addEventListener("click", async () => {
+        save.disabled = true;
+        msg.textContent = "";
+        try {
+          await dl.save({ filename: name, data: blob });
+          msg.textContent = "Saved.";
+        } catch (e) {
+          msg.textContent = e && e.code === "declined" ? "Not saved." : "Could not save this file here.";
+        }
+        save.disabled = false;
+      });
+      actions.append(save, msg);
+    } else {
+      actions.append(el("span", "hint", "Saving files is not available in this view."));
+    }
+    row.li.append(actions);
+
+    const url = URL.createObjectURL(blob);
+    urls.push(url);
+    const v = document.createElement("video");
+    v.className = "preview";
+    v.controls = true;
+    v.playsInline = true;
+    v.preload = "metadata";
+    v.style.aspectRatio = p.w + " / " + p.h;
+    v.setAttribute("aria-label", "Preview of part " + (i + 1));
+    v.addEventListener("error", () => v.replaceWith(el("p", "hint", "Preview is not available here. Save the file to check it.")));
+    v.src = url;
+    row.li.append(v);
+  }
+
+  function showFail(row, e) {
+    row.prog.remove();
+    row.status.className = "part-status part-error";
+    row.status.textContent = "Failed: " + (e && e.message ? e.message : "unknown error");
+  }
+
+  /* ---------- conversion ---------- */
+
+  async function convertPart(p, row) {
+    const output = new MB.Output({ format: new MB.Mp4OutputFormat({ fastStart: "in-memory" }), target: new MB.BufferTarget() });
+    const trim = { start: row.start, end: row.end };
+    let conv;
+    if (p.mode === "copy") {
+      if (row.openStart) delete trim.start;
+      if (row.openEnd) delete trim.end;
+      // "shrink" keeps only media fully inside the part, so a part never runs a frame past its cut.
+      conv = await MB.Conversion.init({
+        input, output, trim, tracks: "primary",
+        copy: { mode: "forced", boundaryPolicy: "shrink" },
+        showWarnings: false,
+      });
+      const benign = ["discarded_by_user", "max_track_count_reached", "max_track_count_of_type_reached"];
+      const lost = conv.discardedTracks.filter((d) => !benign.includes(d.reason));
+      if (!conv.isValid || lost.length) {
+        const why = lost.map((d) => d.reason.replace(/_/g, " ")).join(", ");
+        throw new Error("This video's format cannot be copied into an MP4 without re-encoding" + (why ? " (" + why + ")" : "") + ". Try Re-encode.");
+      }
+    } else {
+      const video = {
+        codec: "avc", width: p.w, height: p.h, fit: "fill",
+        // VBR: same average bitrate, but bits follow complexity. CBR was starving motion.
+        quality: new MB.Quality({ bitrate: Math.round(p.videoBps * (row.boost || 1)), bitrateMode: "variable" }),
+        keyFrameInterval: 2, forceTranscode: true,
+        // Hardware encoder: better rate control, and avoids Chrome's software H.264 colour-range mislabel.
+        hardwareAcceleration: "prefer-hardware",
+      };
+      if (p.frameRate) video.frameRate = p.frameRate;
+      const audio = env.aac ? { codec: "aac", bitrate: AUDIO_BPS, numberOfChannels: 2, forceTranscode: true } : {};
+      conv = await MB.Conversion.init({ input, output, trim, video, audio, showWarnings: false });
+      if (!conv.isValid) {
+        const why = conv.discardedTracks.map((d) => d.reason.replace(/_/g, " ")).join(", ");
+        throw new Error("This file cannot be converted here" + (why ? " (" + why + ")." : "."));
+      }
+    }
+    current = conv;
+    conv.onProgress = (frac) => { row.prog.value = frac; row.status.textContent = (p.mode === "copy" ? "Cutting " : "Encoding ") + Math.round(frac * 100) + "%"; };
+    await conv.execute();
+    current = null;
+    return new Blob([output.target.buffer], { type: "video/mp4" });
+  }
+
+  async function run() {
+    if (!src || !input || running) return;
+    running = true;
+    canceled = false;
+    clearOutput();
+    syncButtons();
+    try { wakeLock = navigator.wakeLock ? await navigator.wakeLock.request("screen") : null; } catch (e) { wakeLock = null; }
+
+    const set = readSettings();
+    let p;
+    let bounds = null;
+    try {
+      if (set.mode === "copy") {
+        bounds = await computeCuts();
+        p = { mode: "copy", parts: bounds.length - 1, w: src.dw, h: src.dh };
+      } else {
+        p = computePlan(src, set);
+      }
+    } catch (e) {
+      running = false;
+      showSrcMsg("Could not work out where to cut. " + (e && e.message ? e.message : ""));
+      syncButtons();
+      return;
+    }
+
+    const base = (src.name.replace(/\.[^.]+$/, "").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-").slice(0, 40)) || "video";
+    let done = 0;
+    let boost = 1; // bitrate multiplier learned from this device's encoder
+    for (let i = 0; i < p.parts; i++) {
+      const start = bounds ? bounds[i] : i * (Number.isFinite(p.partSec) ? p.partSec : 0);
+      // Exact cut: parts stay under the length limit. Tested to lose at most one frame per cut; nudging the end forward brings back a duplicate keyframe.
+      const end = bounds ? bounds[i + 1] : Number.isFinite(p.partSec) ? Math.min((i + 1) * p.partSec, src.duration) : src.duration;
+      const row = addPartRow(i, p, start, end);
+      // Split-only: the first part starts at the file's own start and the last runs to its own end, so no edge frame is lost to rounding.
+      row.openStart = !!bounds && i === 0;
+      row.openEnd = !!bounds && i === p.parts - 1;
+      try {
+        row.boost = boost;
+        let blob = await convertPart(p, row);
+        if (p.mode === "encode" && !canceled) {
+          const next = nextBoost((blob.size * 8) / Math.max(0.1, end - start), p.videoBps + p.audioBps, boost);
+          if (next) {
+            row.status.textContent = "The encoder gave less than asked for. Retrying at a higher bitrate.";
+            row.prog.value = 0;
+            row.boost = next;
+            const again = await convertPart(p, row);
+            if (again.size > blob.size * 1.05) { blob = again; boost = next; row.retried = true; }
+          }
+        }
+        showDone(row, blob, p, i, base);
+        done++;
+      } catch (e) {
+        current = null;
+        if (canceled) { row.prog.remove(); row.status.textContent = "Canceled"; }
+        else showFail(row, e);
+        break;
+      }
+    }
+
+    running = false;
+    if (wakeLock) { try { await wakeLock.release(); } catch (e) { /* ignore */ } wakeLock = null; }
+    const sum = $("summary");
+    if (done > 0) {
+      sum.textContent = done + (done === 1 ? " part is ready" : " parts are ready") + (p.mode === "copy" ? " at original quality." : ".") + " Save each one, then post them in order from your gallery.";
+      sum.hidden = false;
+    }
+    syncButtons();
+  }
+
+  /* ---------- wiring ---------- */
+
+  const onSettings = () => { renderPlan(); refreshCuts().then(renderPlan); };
+  $("file").addEventListener("change", (e) => { loadFile(e.target.files && e.target.files[0]); e.target.value = ""; });
+  const drop = $("drop");
+  ["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", (e) => loadFile(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]));
+  ["res", "part", "bitrate"].forEach((id) => $(id).addEventListener("input", onSettings));
+  document.querySelectorAll('input[name="mode"]').forEach((r) => r.addEventListener("change", onSettings));
+  $("go").addEventListener("click", run);
+  $("stop").addEventListener("click", () => { canceled = true; if (current) current.cancel(); });
+
+  renderEnv();
+  renderFacts();
+  renderPlan();
+  initDownloads();
+  initEnv();
+})();
+</script>
+
+</body></html>
