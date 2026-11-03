@@ -5,7 +5,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
-/* Layout: one work column. Source, Settings and Output stack in the order you use them. Split-only is the default method; the re-encode output meters share one 0 to 16 MB scale so parts compare at a glance. */
 :root {
   --bg: #EBEEF2;
   --surface: #FFFFFF;
@@ -83,7 +82,6 @@ header .lede { margin: 8px 0 0; max-width: 58ch; color: var(--muted); }
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: grid; gap: 16px; min-width: 0; }
 .panel h2 { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); }
 
-/* source */
 .drop { display: grid; gap: 2px; justify-items: start; padding: 16px; border: 1.5px dashed var(--line); border-radius: 8px; cursor: pointer; background: var(--bg); transition: border-color 0.15s, background 0.15s; }
 .drop:hover, .drop.over, .drop:focus-within { border-color: var(--accent); background: var(--accent-soft); }
 .drop strong { font-weight: 600; }
@@ -95,7 +93,6 @@ header .lede { margin: 8px 0 0; max-width: 58ch; color: var(--muted); }
 .facts dd { margin: 2px 0 0; font-family: var(--font-data); font-size: 14px; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .tag { display: inline-block; font-family: var(--font-data); font-size: 11px; padding: 1px 7px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); margin-left: 6px; vertical-align: 1px; }
 
-/* settings */
 .modes { border: 0; padding: 0; margin: 0; min-width: 0; }
 .modes legend { padding: 0; margin-bottom: 8px; font-weight: 500; font-size: 14px; }
 .mode-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
@@ -123,7 +120,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 6px 0 0;
 .notes .bad { color: var(--bad); }
 .notes .info { color: var(--muted); }
 
-/* actions */
 .actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .btn { font: inherit; font-weight: 500; border-radius: 8px; padding: 10px 18px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); cursor: pointer; }
 .btn:hover:not(:disabled) { border-color: var(--accent); }
@@ -133,7 +129,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 6px 0 0;
 .btn.small { padding: 7px 14px; font-size: 14px; }
 :is(.btn, select, input, .drop):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* output */
 .parts { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
 .part { display: grid; gap: 10px; padding: 16px 0; border-top: 1px solid var(--line); min-width: 0; }
 .part:first-child { border-top: 0; padding-top: 0; }
@@ -184,7 +179,7 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
         </label>
         <label class="mode">
           <input type="radio" name="mode" value="encode">
-          <span><strong>Re-encode</strong><small>Converts to H.264 at a set bitrate, the way PureStatus's output is built. An earlier 720p version looked soft and dull on an iPhone.</small></span>
+          <span><strong>Re-encode</strong><small>Converts to H.264 at a set bitrate. Note: Browser encoders are not as good as native phone apps. Use a higher bitrate for best results.</small></span>
         </label>
       </div>
     </fieldset>
@@ -205,12 +200,12 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
           <option value="1920" selected>1080p, 1920 px long edge</option>
           <option value="1280">720p, 1280 px long edge</option>
         </select>
-        <p class="hint">PureStatus kept 1080p on a test clip.</p>
+        <p class="hint">Downscaling can sometimes cause blur.</p>
       </div>
       <div class="field" id="fBitrate" hidden>
-        <div class="range-row"><label for="bitrate">Video bitrate</label><output id="bitrateOut" for="bitrate" class="mono">4.0 Mbps</output></div>
-        <input type="range" id="bitrate" min="1.5" max="10" step="0.1" value="4">
-        <p class="hint">PureStatus gave about 3.8 Mbps on one test clip.</p>
+        <div class="range-row"><label for="bitrate">Video bitrate</label><output id="bitrateOut" for="bitrate" class="mono">6.0 Mbps</output></div>
+        <input type="range" id="bitrate" min="2" max="15" step="0.5" value="6">
+        <p class="hint">Higher is clearer. If the file exceeds 16MB, lower this.</p>
       </div>
     </div>
     <dl class="plan" id="plan"></dl>
@@ -224,7 +219,7 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
 
   <section class="panel" aria-labelledby="h-out">
     <h2 id="h-out">Output</h2>
-    <p class="empty" id="empty">Parts appear here, each with a preview and a Save button.</p>
+    <p class="empty" id="empty">Parts appear here, each with a preview and a Download button.</p>
     <ol class="parts" id="parts"></ol>
     <p class="summary" id="summary" aria-live="polite" hidden></p>
   </section>
@@ -238,7 +233,7 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
   const AUDIO_BPS = 128000;
   const SCALE_MB = 16;
   const MAX_BOOST = 3;
-  const TOL = 0.25; // seconds a clip may run past the part length before it counts as another part
+  const TOL = 0.25; 
   const EXAMPLE = { name: "Example clip", size: null, duration: 95, dw: 1080, dh: 1920, fps: 30, codec: "hevc", hdr: false, hasAudio: true, colorSpace: null, example: true };
 
   const $ = (id) => document.getElementById(id);
@@ -254,18 +249,16 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
   const getMode = () => (document.querySelector('input[name="mode"]:checked') || {}).value || "copy";
 
   const env = { lib: null, webcodecs: false, h264: false, aac: false, ready: false };
-  let MB = null;          // mediabunny namespace once loaded
-  let input = null;       // mediabunny Input for the chosen file
-  let src = null;         // facts about the chosen file
-  let cutsState = null;   // keyframe cut points for the current file and part length
+  let MB = null;          
+  let input = null;       
+  let src = null;         
+  let cutsState = null;   
   let lastPlan = null;
   let running = false;
   let canceled = false;
-  let current = null;     // running Conversion
+  let current = null;     
   let wakeLock = null;
   let urls = [];
-
-  /* ---------- planning ---------- */
 
   function readSettings() {
     return { mode: getMode(), longEdge: +$("res").value, partSec: +$("part").value, bitrateMbps: +$("bitrate").value };
@@ -291,7 +284,6 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
     };
   }
 
-  // When the device's encoder returns well under the bitrate asked for, ask for more, up to MAX_BOOST times the plan.
   function nextBoost(actualBps, targetBps, boost) {
     if (actualBps >= targetBps * 0.8 || boost >= MAX_BOOST) return null;
     return Math.min(MAX_BOOST, boost * (targetBps / actualBps));
@@ -323,7 +315,7 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
       try {
         const kp = await vt.getKeyPacket(target);
         if (kp && kp.timestamp > start + 0.5) t = kp.timestamp;
-      } catch (e) { /* fall back to the plain cut point */ }
+      } catch (e) { /* fall back */ }
       cuts.push(t);
       start = t;
     }
@@ -331,7 +323,6 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
     return cuts;
   }
 
-  // Read the first decoded frame's colour metadata so the UI can warn about full-range sources.
   async function probeColorSpace(vt) {
     try {
       const sink = new MB.VideoSampleSink(vt);
@@ -379,8 +370,6 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
       if (s.example) note("info", "Showing an example 1:35 portrait clip. Choose a video to plan with yours.");
       if (p.single && !s.example) note("warn", "This video already fits in one part. There is nothing to cut, so post the original from your gallery.");
       if (!p.single) note("info", "Parts are cut at keyframes, so each is a little shorter than the length you picked. At most one frame is lost at each cut.");
-      note("info", "This only helps with videos longer than the status limit. Under 30 seconds, posting the original is the same thing.");
-      if (p.estBytes != null && p.estBytes > 150e6) note("warn", "Parts this large (≈ " + fmtMB(p.estBytes) + ") may run out of memory on a phone.");
     } else {
       p = computePlan(s, set);
       row("Parts", p.parts === 1 ? "1 × " + mmss(p.sliceSec) : p.parts + " × " + mmss(p.sliceSec));
@@ -389,11 +378,8 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
       row("Estimated size", "≈ " + fmtMB(p.estBytes) + " per part");
       if (s.example) note("info", "Showing an example 1:35 portrait clip. Choose a video to plan with yours.");
       if (s.hdr) note("warn", "HDR video detected. Browsers convert HDR to normal colour imperfectly, so colours can look dull. For the best result, turn off HDR Video in Settings, Camera, Record Video, and record again.");
-      if (s.colorSpace && s.colorSpace.fullRange === true && !s.hdr) note("warn", "Source is full-range. Chrome's software encoder sometimes mislabels these as limited-range, which looks washed out. Hardware acceleration is on to avoid this — if the output still looks dull, re-export the source as limited-range.");
       if (p.over) note("warn", "Each part is estimated above 16 MB, the usual WhatsApp video limit. Lower the bitrate or part length if the upload fails.");
-      if (!p.downscaled && !s.example) note("info", "The source is already at or below this resolution, so it keeps its size.");
       if (p.parts > 12) note("warn", "This makes " + p.parts + " parts. Check the part length.");
-      if (env.lib && !env.aac && s.hasAudio) note("warn", "AAC encoding is not available in this browser. The original audio is kept where possible.");
     }
     lastPlan = p;
     syncButtons();
@@ -417,11 +403,6 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
     add("Frame rate", s.fps ? Math.round(s.fps) + " fps" : "unknown");
     add("Video codec", s.codec || "unknown");
     add("Dynamic range", s.hdr ? "HDR" : "standard");
-    if (s.colorSpace) {
-      const cs = s.colorSpace;
-      const range = cs.fullRange === true ? "full" : cs.fullRange === false ? "limited" : "unknown";
-      add("Colour range", range + (cs.transfer ? " · " + cs.transfer : ""));
-    }
     add("Audio", s.hasAudio ? "yes" : "none");
     add("Size", s.size != null ? fmtMB(s.size) : "not set");
   }
@@ -444,8 +425,6 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
     else if (blockedSingle) hint = "Nothing to cut.";
     $("goHint").textContent = hint;
   }
-
-  /* ---------- environment ---------- */
 
   function renderEnv() {
     const list = $("env");
@@ -474,8 +453,6 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
     renderPlan();
   }
 
-  /* ---------- source ---------- */
-
   function showSrcMsg(text) {
     const m = $("srcMsg");
     m.textContent = "";
@@ -484,7 +461,7 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
   }
 
   function disposeInput() {
-    if (input) { try { input.dispose(); } catch (e) { /* already gone */ } }
+    if (input) { try { input.dispose(); } catch (e) { /* gone */ } }
     input = null;
   }
 
@@ -504,9 +481,9 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
       const at = await inp.getPrimaryAudioTrack();
       const duration = await inp.computeDuration();
       let fps = 0;
-      try { fps = (await vt.computePacketStats(120)).averagePacketRate; } catch (e) { /* leave unknown */ }
+      try { fps = (await vt.computePacketStats(120)).averagePacketRate; } catch (e) { /* unknown */ }
       let hdr = false;
-      try { hdr = await vt.hasHighDynamicRange(); } catch (e) { /* leave standard */ }
+      try { hdr = await vt.hasHighDynamicRange(); } catch (e) { /* standard */ }
       const colorSpace = await probeColorSpace(vt);
       input = inp;
       src = { name: file.name, size: file.size, duration, dw: vt.displayWidth, dh: vt.displayHeight, fps, codec: vt.codec, hdr, hasAudio: !!at, colorSpace, example: false };
@@ -517,8 +494,6 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
     renderFacts();
     renderPlan();
   }
-
-  /* ---------- output ---------- */
 
   function clearOutput() {
     urls.forEach((u) => URL.revokeObjectURL(u));
@@ -558,8 +533,6 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
       const plannedMB = p.estBytes / 1e6;
       row.status.textContent = sizeMB.toFixed(1) + " MB · " + avg + " (asked " + fmtMbps(p.videoBps + p.audioBps) + ") · " + p.w + "×" + p.h + (row.retried ? " · retried at a higher bitrate" : "");
       const meter = el("div", "meter");
-      meter.setAttribute("role", "img");
-      meter.setAttribute("aria-label", sizeMB.toFixed(1) + " megabytes on a scale to " + SCALE_MB + "; planned " + plannedMB.toFixed(1));
       const fill = el("i", sizeMB > SCALE_MB ? "over" : "");
       fill.style.width = Math.min(100, (sizeMB / SCALE_MB) * 100) + "%";
       const tick = el("b");
@@ -568,15 +541,11 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
       const scale = el("div", "scale mono");
       scale.append(el("span", null, "0"), el("span", null, "tick = planned " + plannedMB.toFixed(1) + " MB"), el("span", null, SCALE_MB + " MB"));
       row.li.append(meter, scale);
-      if (sizeMB < plannedMB * 0.8) {
-        row.li.append(el("p", "hint", "Your device's encoder gave less than the bitrate asked for. That is normal for simple pictures. If it looks soft, tell me the size and I will adjust."));
-      }
     }
 
     const name = base + "-status" + (p.parts > 1 ? "-p" + (i + 1) : "") + ".mp4";
     const actions = el("div", "actions");
     
-    // --- BROWSER DOWNLOAD & MOBILE SHARE (UPDATED FOR GITHUB PAGES) ---
     const downloadBtn = el("button", "btn small", "Download " + name);
     downloadBtn.type = "button";
     downloadBtn.addEventListener("click", () => {
@@ -621,7 +590,6 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
     v.playsInline = true;
     v.preload = "metadata";
     v.style.aspectRatio = p.w + " / " + p.h;
-    v.setAttribute("aria-label", "Preview of part " + (i + 1));
     v.addEventListener("error", () => v.replaceWith(el("p", "hint", "Preview is not available here. Save the file to check it.")));
     v.src = url;
     row.li.append(v);
@@ -633,8 +601,6 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
     row.status.textContent = "Failed: " + (e && e.message ? e.message : "unknown error");
   }
 
-  /* ---------- conversion ---------- */
-
   async function convertPart(p, row) {
     const output = new MB.Output({ format: new MB.Mp4OutputFormat({ fastStart: "in-memory" }), target: new MB.BufferTarget() });
     const trim = { start: row.start, end: row.end };
@@ -642,7 +608,6 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
     if (p.mode === "copy") {
       if (row.openStart) delete trim.start;
       if (row.openEnd) delete trim.end;
-      // "shrink" keeps only media fully inside the part, so a part never runs a frame past its cut.
       conv = await MB.Conversion.init({
         input, output, trim, tracks: "primary",
         copy: { mode: "forced", boundaryPolicy: "shrink" },
@@ -655,13 +620,18 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
         throw new Error("This video's format cannot be copied into an MP4 without re-encoding" + (why ? " (" + why + ")" : "") + ". Try Re-encode.");
       }
     } else {
+      // Reverted to Software Encoding. Fixed stretch bug with 'contain'. Higher default bitrate.
       const video = {
-        codec: "avc", width: p.w, height: p.h, fit: "fill",
-        // VBR: same average bitrate, but bits follow complexity. CBR was starving motion.
-        quality: new MB.Quality({ bitrate: Math.round(p.videoBps * (row.boost || 1)), bitrateMode: "variable" }),
-        keyFrameInterval: 2, forceTranscode: true,
-        // Hardware encoder: better rate control, and avoids Chrome's software H.264 colour-range mislabel.
-        hardwareAcceleration: "prefer-hardware",
+        codec: "avc", 
+        width: p.w, 
+        height: p.h, 
+        fit: "contain", 
+        quality: new MB.Quality({ 
+          bitrate: Math.round(p.videoBps * (row.boost || 1)), 
+          bitrateMode: "variable" 
+        }),
+        keyFrameInterval: 2, 
+        forceTranscode: true
       };
       if (p.frameRate) video.frameRate = p.frameRate;
       const audio = env.aac ? { codec: "aac", bitrate: AUDIO_BPS, numberOfChannels: 2, forceTranscode: true } : {};
@@ -705,13 +675,11 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
 
     const base = (src.name.replace(/\.[^.]+$/, "").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-").slice(0, 40)) || "video";
     let done = 0;
-    let boost = 1; // bitrate multiplier learned from this device's encoder
+    let boost = 1; 
     for (let i = 0; i < p.parts; i++) {
       const start = bounds ? bounds[i] : i * (Number.isFinite(p.partSec) ? p.partSec : 0);
-      // Exact cut: parts stay under the length limit. Tested to lose at most one frame per cut; nudging the end forward brings back a duplicate keyframe.
       const end = bounds ? bounds[i + 1] : Number.isFinite(p.partSec) ? Math.min((i + 1) * p.partSec, src.duration) : src.duration;
       const row = addPartRow(i, p, start, end);
-      // Split-only: the first part starts at the file's own start and the last runs to its own end, so no edge frame is lost to rounding.
       row.openStart = !!bounds && i === 0;
       row.openEnd = !!bounds && i === p.parts - 1;
       try {
@@ -746,8 +714,6 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
     }
     syncButtons();
   }
-
-  /* ---------- wiring ---------- */
 
   const onSettings = () => { renderPlan(); refreshCuts().then(renderPlan); };
   $("file").addEventListener("change", (e) => { loadFile(e.target.files && e.target.files[0]); e.target.value = ""; });
