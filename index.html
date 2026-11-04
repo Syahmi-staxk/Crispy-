@@ -9,7 +9,7 @@
   @media(prefers-color-scheme:dark){:root{--bg:#0f1218;--card:#181c24;--ink:#e9edf3;--mute:#9aa3b3;--line:#2b313c;--acc:#ff5a43}}
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,sans-serif}
-  .wrap{max-width:560px;margin:0 auto;padding:20px 16px 48px;display:flex;flex-direction:column;gap:14px}
+  .wrap{max-width:620px;margin:0 auto;padding:20px 16px 48px;display:flex;flex-direction:column;gap:14px}
   h1{font-size:24px;margin:8px 0 0}
   p.sub{margin:0;color:var(--mute)}
   .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px}
@@ -17,64 +17,100 @@
   .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
   .btn:disabled{opacity:.4;cursor:not-allowed}
   .drop{border:1.5px dashed var(--line);border-radius:12px;padding:26px 12px;text-align:center;color:var(--mute);cursor:pointer}
-  .drop.over{border-color:var(--acc)}
-  video,img{max-width:100%;border-radius:10px;background:#000;max-height:360px;display:block;margin:auto}
+  video,img,canvas{max-width:100%;border-radius:10px;background:#000;display:block;width:100%;height:auto;max-height:340px;object-fit:contain}
+  .cmp{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .cmp figure{margin:0;display:flex;flex-direction:column;gap:4px}
+  .cmp figcaption{font-size:12px;color:var(--mute);text-transform:uppercase;letter-spacing:.06em}
   .seg{display:flex;gap:4px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:3px}
-  .seg button{flex:1;font:inherit;font-weight:600;border:0;border-radius:7px;padding:8px 4px;background:transparent;color:var(--mute);cursor:pointer}
+  .seg button{flex:1;font:inherit;font-weight:600;font-size:13px;border:0;border-radius:7px;padding:8px 4px;background:transparent;color:var(--mute);cursor:pointer}
   .seg button[aria-pressed=true]{background:var(--ink);color:var(--card)}
-  label.l{font-weight:600;font-size:13px}
+  label.l{font-weight:600;font-size:13px;display:block}
+  .row{display:flex;align-items:center;gap:10px}
+  .row input[type=range]{flex:1;accent-color:var(--acc)}
+  .row output{font-family:ui-monospace,Menlo,monospace;font-size:13px;min-width:44px;text-align:right}
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .grid div{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+  .grid div{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px;min-width:0}
   .grid span{display:block;font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.06em}
-  .grid b{font-family:ui-monospace,Menlo,monospace;font-size:14px}
+  .grid b{font-family:ui-monospace,Menlo,monospace;font-size:13px;overflow-wrap:anywhere}
   .bar{height:12px;background:var(--bg);border:1px solid var(--line);border-radius:6px;overflow:hidden}
   .bar i{display:block;height:100%;width:0;background:var(--acc);transition:width .15s}
   .err{background:#fde6e1;color:#7a1d10;border-radius:10px;padding:10px 12px}
   .hint{font-size:13px;color:var(--mute);margin:0}
+  hr{border:0;border-top:1px solid var(--line);width:100%;margin:2px 0}
   [hidden]{display:none!important}
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>WA Status Optimizer</h1>
-  <p class="sub">Re-encodes video/photos to the format WhatsApp Status handles best (1080p, ~30 fps, ~3.8 Mbps) so it re-compresses less. Everything runs on your device.</p>
+  <p class="sub">Converts iPhone HDR properly, scales with Lanczos, and encodes with x264 at WhatsApp's target (1080p, 30 fps, ~3.8 Mbps). Runs entirely on your device.</p>
 
   <div class="card">
     <input type="file" id="file" accept="video/*,image/*" hidden>
     <div class="drop" id="drop">Tap to choose a video or photo<br><small>or drop a file here</small></div>
-    <div id="preview" hidden>
-      <video id="pv" controls playsinline muted hidden></video>
+    <div id="cmpBox" hidden>
+      <div class="cmp">
+        <figure><video id="pv" controls playsinline muted></video><figcaption>Original (as your device shows it)</figcaption></figure>
+        <figure><canvas id="pc"></canvas><figcaption id="pcCap">Processed preview</figcaption></figure>
+      </div>
       <img id="pi" hidden alt="">
+    </div>
+    <div id="scrub" hidden>
+      <label class="l">Preview frame</label>
+      <div class="row"><input type="range" id="pt" min="0" max="1" step="0.01" value="0.3"><output id="ptO">0.0s</output></div>
     </div>
     <div class="grid" id="meta" hidden>
       <div><span>File</span><b id="mName">-</b></div>
       <div><span>Size</span><b id="mSize">-</b></div>
       <div><span>Resolution</span><b id="mRes">-</b></div>
-      <div><span>Duration</span><b id="mDur">-</b></div>
+      <div><span>Duration · Colour</span><b id="mDur">-</b></div>
     </div>
+    <button class="btn ghost" id="change" hidden>Choose another file</button>
+  </div>
+
+  <div class="card" id="grade" hidden>
+    <label class="l">Look</label>
+    <div class="seg" id="presetSeg">
+      <button data-p="natural">Natural</button>
+      <button data-p="bright">Bright</button>
+      <button data-p="punchy">Punchy</button>
+    </div>
+    <div class="row"><label class="l" style="width:92px">Brightness</label><input type="range" id="gEv" min="-1" max="1.5" step="0.05"><output id="gEvO"></output></div>
+    <div class="row"><label class="l" style="width:92px">Contrast</label><input type="range" id="gC" min="0.8" max="1.3" step="0.01"><output id="gCO"></output></div>
+    <div class="row"><label class="l" style="width:92px">Colour</label><input type="range" id="gS" min="0.7" max="1.5" step="0.01"><output id="gSO"></output></div>
+    <div class="row" id="kneeRow"><label class="l" style="width:92px">Highlights</label><input type="range" id="gK" min="0.5" max="0.95" step="0.01"><output id="gKO"></output></div>
+    <p class="hint" id="gHint">Compare the two previews. Too dark/dull → raise Brightness. Too harsh → lower Contrast. Blown-out sky → lower Highlights.</p>
   </div>
 
   <div class="card" id="opts" hidden>
     <div id="vOpts">
-      <label class="l">Frame rate</label>
-      <div class="seg" id="fpsSeg">
-        <button data-v="30" aria-pressed="true">30 fps (recommended)</button>
-        <button data-v="60" aria-pressed="false">60 fps</button>
+      <label class="l">Quality engine</label>
+      <div class="seg" id="encSeg">
+        <button data-v="x264">Sharp (x264, slower)</button>
+        <button data-v="hw">Fast (device encoder)</button>
       </div>
-      <label class="l" style="margin-top:10px;display:block">Video bitrate (Mbps)</label>
+      <div class="seg" id="presetX" style="margin-top:6px">
+        <button data-v="medium">Medium</button>
+        <button data-v="faster">Faster</button>
+        <button data-v="veryfast">Veryfast</button>
+      </div>
+      <label class="l" style="margin-top:6px">Frame rate</label>
+      <div class="seg" id="fpsSeg">
+        <button data-v="30">30 fps (recommended)</button>
+        <button data-v="60">60 fps</button>
+      </div>
+      <label class="l" style="margin-top:6px">Video bitrate (Mbps)</label>
       <div class="seg" id="brSeg">
-        <button data-v="3" aria-pressed="false">3.0</button>
-        <button data-v="3.8" aria-pressed="true">3.8</button>
-        <button data-v="4.5" aria-pressed="false">4.5</button>
+        <button data-v="3">3.0</button>
+        <button data-v="3.5">3.5</button>
+        <button data-v="3.8">3.8</button>
       </div>
       <p class="hint" id="vHint"></p>
     </div>
     <div id="iOpts" hidden>
       <label class="l">JPEG quality</label>
       <div class="seg" id="qSeg">
-        <button data-v="0.9" aria-pressed="false">90%</button>
-        <button data-v="0.95" aria-pressed="true">95%</button>
-        <button data-v="1" aria-pressed="false">100%</button>
+        <button data-v="0.9">90%</button><button data-v="0.95">95%</button><button data-v="1">100%</button>
       </div>
     </div>
     <div class="err" id="err" hidden></div>
@@ -92,201 +128,526 @@
     <div class="hint" id="oMeta"></div>
     <button class="btn" id="share" hidden>Share to WhatsApp / Save</button>
     <a class="btn ghost" id="dl" href="#" download>Download file</a>
-    <p class="hint">Upload tips: tap HD in WhatsApp if shown, and don't trim, add text or stickers inside WhatsApp (edits trigger another compression). Status videos are limited to 60 s.</p>
+    <p class="hint">Upload tips: tap HD in WhatsApp if shown; don't trim or add text/stickers inside WhatsApp (that triggers another compression); Status clips are limited to 60 s.</p>
   </div>
 </div>
 
 <script type="module">
 import {
   Input, Output, Conversion, BlobSource, BufferTarget, Mp4OutputFormat, ALL_FORMATS,
-  CanvasSink, CanvasSource, EncodedPacketSink, EncodedAudioPacketSource
+  VideoSampleSink, VideoSampleSource, VideoSample, EncodedPacketSink, EncodedAudioPacketSource
 } from "https://cdn.jsdelivr.net/npm/mediabunny/dist/bundles/mediabunny.min.mjs";
 
 const $ = s => document.querySelector(s);
-const state = { file:null, kind:null, fps:30, br:3.8, q:0.95, conv:null, outUrl:null, outFile:null };
 const fmtSize = b => b>=1e6 ? (b/1e6).toFixed(1)+" MB" : Math.round(b/1e3)+" KB";
 const even = n => { n = Math.round(n); return n%2 ? n+1 : n; };
 const showErr = m => { $("#err").textContent = m||""; $("#err").hidden = !m; };
 
-// ---- segmented controls
-function seg(id, key, num=true){
-  document.querySelectorAll(id+" button").forEach(b=>b.addEventListener("click",()=>{
-    document.querySelectorAll(id+" button").forEach(x=>x.setAttribute("aria-pressed",x===b));
-    state[key] = num ? +b.dataset.v : b.dataset.v;
-  }));
-}
-seg("#fpsSeg","fps"); seg("#brSeg","br"); seg("#qSeg","q");
+// ------------------------------------------------------------------ settings
+const PRESETS = {
+  natural:{ev:0,   c:1.00, s:1.00, k:0.75},
+  bright: {ev:0.4, c:1.00, s:1.05, k:0.75},
+  punchy: {ev:0.3, c:1.10, s:1.15, k:0.80}
+};
+const st = { fps:30, br:3.8, q:0.95, enc:"x264", preset:"medium", stop:false, running:false,
+             grade:{...PRESETS.natural}, preset_name:"natural", outUrl:null, outFile:null, worker:null };
+try{ const s=JSON.parse(localStorage.getItem("wa_opt")||"null"); if(s){ Object.assign(st, s.o||{}); if(s.g) st.grade=s.g; } }catch{}
+const save = () => { try{ localStorage.setItem("wa_opt", JSON.stringify({o:{fps:st.fps,br:st.br,q:st.q,enc:st.enc,preset:st.preset,preset_name:st.preset_name}, g:st.grade})); }catch{} };
 
-// ---- file picking
+function bindSeg(id, key, cb){
+  const els = document.querySelectorAll(id+" button");
+  const paint = () => els.forEach(b=>b.setAttribute("aria-pressed", String(b.dataset.v)===String(st[key])));
+  els.forEach(b=>b.addEventListener("click",()=>{ if(st.running) return; st[key]=isNaN(+b.dataset.v)?b.dataset.v:+b.dataset.v; paint(); save(); cb&&cb(); }));
+  paint();
+}
+bindSeg("#fpsSeg","fps"); bindSeg("#brSeg","br"); bindSeg("#qSeg","q");
+bindSeg("#encSeg","enc",()=>{ $("#presetX").hidden = st.enc!=="x264"; });
+bindSeg("#presetX","preset");
+$("#presetX").hidden = st.enc!=="x264";
+
+const sl = {ev:["#gEv","#gEvO",v=>(v>0?"+":"")+v.toFixed(2)], c:["#gC","#gCO",v=>v.toFixed(2)], s:["#gS","#gSO",v=>v.toFixed(2)], k:["#gK","#gKO",v=>v.toFixed(2)]};
+function paintSliders(){
+  for(const k in sl){ $(sl[k][0]).value = st.grade[k]; $(sl[k][1]).textContent = sl[k][2](+st.grade[k]); }
+  document.querySelectorAll("#presetSeg button").forEach(b=>b.setAttribute("aria-pressed", String(b.dataset.p===st.preset_name)));
+}
+for(const k in sl) $(sl[k][0]).addEventListener("input",e=>{ st.grade[k]=+e.target.value; st.preset_name=""; paintSliders(); save(); schedulePreview(); });
+document.querySelectorAll("#presetSeg button").forEach(b=>b.addEventListener("click",()=>{ st.grade={...PRESETS[b.dataset.p]}; st.preset_name=b.dataset.p; paintSliders(); save(); schedulePreview(); }));
+paintSliders();
+
+// ------------------------------------------------------------------ WebGL colour/scale pipeline
+const VS = `#version 300 es
+in vec2 p; void main(){ gl_Position = vec4(p,0.0,1.0); }`;
+
+const GRADE = `
+uniform float ev, contrast, sat, knee;
+vec3 grade(vec3 s){
+  s = clamp(s,0.0,1.0);
+  s = (s - 0.45) * contrast + 0.45;
+  float l = dot(s, vec3(0.2126,0.7152,0.0722));
+  s = mix(vec3(l), s, sat);
+  return clamp(s,0.0,1.0);
+}
+vec3 gammaUp(vec3 s){ // exposure on already-encoded SDR
+  if(ev == 0.0) return s;
+  return pow(clamp(pow(s,vec3(2.2))*exp2(ev),0.0,1.0), vec3(1.0/2.2));
+}
+`;
+
+const FS_YUV = `#version 300 es
+precision highp float; precision highp int; precision highp usampler2D;
+uniform usampler2D tY, tU, tV; uniform int nv12; uniform ivec2 srcY, srcC, outS; uniform int rot;
+uniform float maxc, kr, kb; uniform int full, mode;
+${GRADE}
+out vec4 o;
+float bil(usampler2D t, vec2 c, ivec2 sz, int ch){
+  c = clamp(c, vec2(0.0), vec2(sz)-1.0); ivec2 i = ivec2(floor(c)); vec2 f = c - vec2(i); ivec2 j = min(i+1, sz-1);
+  float a = float(texelFetch(t,i,0)[ch]), b = float(texelFetch(t,ivec2(j.x,i.y),0)[ch]);
+  float cc = float(texelFetch(t,ivec2(i.x,j.y),0)[ch]), d = float(texelFetch(t,j,0)[ch]);
+  return mix(mix(a,b,f.x), mix(cc,d,f.x), f.y);
+}
+vec3 hlgInv(vec3 v){ const float a=0.17883277,b=0.28466892,c=0.55991073;
+  return mix(v*v/3.0, (exp((v-c)/a)+b)/12.0, step(vec3(0.5), v)); }
+vec3 pqEotf(vec3 v){ const float m1=0.1593017578125,m2=78.84375,c1=0.8359375,c2=18.8515625,c3=18.6875;
+  vec3 q = pow(max(v,0.0), vec3(1.0/m2)); return 10000.0*pow(max(q-c1,0.0)/(c2-c3*q), vec3(1.0/m1)); }
+const mat3 M2020to709 = mat3(1.6605,-0.1246,-0.0182, -0.5876,1.1329,-0.1006, -0.0728,-0.0083,1.1187);
+// soft shoulder: below 'knee' untouched, above it rolls smoothly toward 1.0 (keeps hue by scaling all channels)
+vec3 shoulder(vec3 d){
+  d = max(d, 0.0);
+  float m = max(max(d.r,d.g), d.b);
+  if(m > knee){ float r = 1.0-knee; float mp = knee + r*(1.0-exp(-(m-knee)/r)); d *= mp/m; }
+  return d;
+}
+vec3 enc(vec3 d){ return pow(clamp(d,0.0,1.0), vec3(1.0/2.2)); }
+void main(){
+  vec2 uv = gl_FragCoord.xy / vec2(outS);
+  vec2 s = uv;
+  if(rot==90) s = vec2(uv.y, 1.0-uv.x); else if(rot==180) s = vec2(1.0-uv.x, 1.0-uv.y); else if(rot==270) s = vec2(1.0-uv.y, uv.x);
+  float Y = bil(tY, s*vec2(srcY)-0.5, srcY, 0), U, V;
+  if(nv12==1){ U = bil(tU, s*vec2(srcC)-0.5, srcC, 0); V = bil(tU, s*vec2(srcC)-0.5, srcC, 1); }
+  else { U = bil(tU, s*vec2(srcC)-0.5, srcC, 0); V = bil(tV, s*vec2(srcC)-0.5, srcC, 0); }
+  float sc = (maxc+1.0)/256.0, y, cb, cr;
+  if(full==1){ y=Y/maxc; cb=(U-(maxc+1.0)/2.0)/maxc; cr=(V-(maxc+1.0)/2.0)/maxc; }
+  else { y=(Y-16.0*sc)/(219.0*sc); cb=(U-128.0*sc)/(224.0*sc); cr=(V-128.0*sc)/(224.0*sc); }
+  float r = y + 2.0*(1.0-kr)*cr, b = y + 2.0*(1.0-kb)*cb, g = (y - kr*r - kb*b)/(1.0-kr-kb);
+  vec3 c = clamp(vec3(r,g,b), 0.0, 1.0);
+  if(mode==1){
+    // HLG -> scene light -> display light (BT.2100 OOTF, 1000 nit) -> relative to 203-nit SDR white
+    vec3 e = hlgInv(c);
+    float ys = dot(e, vec3(0.2627,0.6780,0.0593));
+    vec3 d = e * pow(max(ys,1e-6), 0.2) * (1000.0/203.0);
+    d = M2020to709 * d;
+    c = enc(shoulder(d * exp2(ev)));
+  } else if(mode==2){
+    vec3 d = M2020to709 * (pqEotf(c)/203.0);
+    c = enc(shoulder(d * exp2(ev)));
+  } else { c = gammaUp(c); }
+  o = vec4(grade(c), 1.0);
+}`;
+
+const FS_TEX = `#version 300 es
+precision highp float;
+uniform sampler2D tex; uniform ivec2 outS; uniform int rot;
+${GRADE}
+out vec4 o;
+void main(){
+  vec2 uv = gl_FragCoord.xy / vec2(outS);
+  vec2 s = uv;
+  if(rot==90) s = vec2(uv.y, 1.0-uv.x); else if(rot==180) s = vec2(1.0-uv.x, 1.0-uv.y); else if(rot==270) s = vec2(1.0-uv.y, uv.x);
+  o = vec4(grade(gammaUp(texture(tex, s).rgb)), 1.0);
+}`;
+
+const FS_LANCZOS = `#version 300 es
+precision highp float;
+uniform sampler2D src; uniform int dir, lim, dither; uniform float scale; out vec4 o;
+float lz(float x){ x=abs(x); if(x<1e-5) return 1.0; if(x>=3.0) return 0.0; float p=3.14159265*x; return 3.0*sin(p)*sin(p/3.0)/(p*p); }
+float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233)))*43758.5453); }
+void main(){
+  ivec2 f = ivec2(gl_FragCoord.xy);
+  float cx = (float(dir==0 ? f.x : f.y) + 0.5)*scale - 0.5;
+  int n = int(ceil(3.0*scale)), c0 = int(floor(cx));
+  vec3 acc = vec3(0.0); float ws = 0.0;
+  for(int j=c0-n+1; j<=c0+n; j++){
+    float w = lz((float(j)-cx)/scale); int jj = clamp(j,0,lim-1);
+    acc += w * texelFetch(src, dir==0 ? ivec2(jj,f.y) : ivec2(f.x,jj), 0).rgb; ws += w;
+  }
+  vec3 c = clamp(acc/ws, 0.0, 1.0);
+  if(dither==1){ float d = (hash(gl_FragCoord.xy)+hash(gl_FragCoord.xy+17.3)-1.0)*0.5/255.0; c = clamp(c+d,0.0,1.0); }
+  o = vec4(c,1.0);
+}`;
+
+const RAW_FMT = { I420:[1,255,1], I420P10:[2,1023,1], I420P12:[2,4095,1], NV12:[1,255,2] };
+const KRKB = { bt709:[.2126,.0722], "bt2020-ncl":[.2627,.0593], smpte170m:[.299,.114], bt470bg:[.299,.114] };
+
+class Pipe {
+  constructor(){
+    this.c = document.createElement("canvas");
+    const gl = this.gl = this.c.getContext("webgl2",{antialias:false,depth:false,stencil:false,premultipliedAlpha:false,preserveDrawingBuffer:true});
+    if(!gl) throw new Error("WebGL2 is not available in this browser.");
+    this.f16 = !!gl.getExtension("EXT_color_buffer_float");
+    this.pYuv = this.prog(FS_YUV); this.pTex = this.prog(FS_TEX); this.pLz = this.prog(FS_LANCZOS);
+    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,3,-1,-1,3]), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
+    this.tY = this.rawTex(); this.tU = this.rawTex(); this.tV = this.rawTex(); this.tF = this.rawTex(true);
+    this.dims = ""; this.buf = null; this.loc = new Map();
+  }
+  prog(fs){
+    const gl=this.gl, p=gl.createProgram();
+    for(const [t,src] of [[gl.VERTEX_SHADER,VS],[gl.FRAGMENT_SHADER,fs]]){
+      const s=gl.createShader(t); gl.shaderSource(s,src); gl.compileShader(s);
+      if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)) throw new Error("Shader: "+gl.getShaderInfoLog(s));
+      gl.attachShader(p,s);
+    }
+    gl.bindAttribLocation(p,0,"p"); gl.linkProgram(p);
+    if(!gl.getProgramParameter(p,gl.LINK_STATUS)) throw new Error("Link: "+gl.getProgramInfoLog(p));
+    return p;
+  }
+  U(p,n){ const k=p.__id||(p.__id=Math.random()); const key=k+n; if(!this.loc.has(key)) this.loc.set(key,this.gl.getUniformLocation(p,n)); return this.loc.get(key); }
+  params(t, linear){
+    const gl=this.gl; const f = linear?gl.LINEAR:gl.NEAREST;
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,f); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,f);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  }
+  rawTex(linear){ const gl=this.gl,t=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,t); this.params(t,linear); return t; }
+  target(w,h,fmt){
+    const gl=this.gl,t=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,t); gl.texStorage2D(gl.TEXTURE_2D,1,fmt,w,h); this.params(t,false);
+    const fb=gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER,fb); gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,t,0);
+    if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE) throw new Error("Framebuffer incomplete");
+    return {t,fb};
+  }
+  ensure(rw,rh){
+    const key=rw+"x"+rh; if(key===this.dims) return; this.dims=key;
+    const gl=this.gl;
+    const sc=Math.min(1,1080/Math.min(rw,rh));
+    this.rw=rw; this.rh=rh; this.outW=even(rw*sc); this.outH=even(rh*sc);
+    for(const o of [this.a,this.b,this.c3]) if(o){ gl.deleteTexture(o.t); gl.deleteFramebuffer(o.fb); }
+    this.a = this.target(rw,rh,this.f16?gl.RGBA16F:gl.RGBA8);
+    this.b = this.target(this.outW,rh,this.f16?gl.RGBA16F:gl.RGBA8);
+    this.c3 = this.target(this.outW,this.outH,gl.RGBA8);
+    this.px = new Uint8Array(this.outW*this.outH*4);
+  }
+  async uploadRaw(vf){
+    const gl=this.gl; const [bps,maxc,comp2]=RAW_FMT[vf.format];
+    const size=vf.allocationSize(); if(!this.buf||this.buf.byteLength!==size) this.buf=new Uint8Array(size);
+    const lay=await vf.copyTo(this.buf);
+    const W=vf.visibleRect?vf.visibleRect.width:vf.codedWidth, H=vf.visibleRect?vf.visibleRect.height:vf.codedHeight;
+    const cw=(W+1)>>1, ch=(H+1)>>1, nv=vf.format==="NV12";
+    const put=(tex,l,w,h,comp)=>{
+      gl.bindTexture(gl.TEXTURE_2D,tex);
+      const rl=l.stride/(bps*comp), bytes=l.stride*(h-1)+w*comp*bps, off=this.buf.byteOffset+l.offset;
+      const view = bps===2 ? new Uint16Array(this.buf.buffer,off,bytes/2) : new Uint8Array(this.buf.buffer,off,bytes);
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT,1); gl.pixelStorei(gl.UNPACK_ROW_LENGTH,rl);
+      const ifmt = bps===2 ? (comp===2?gl.RG16UI:gl.R16UI) : (comp===2?gl.RG8UI:gl.R8UI);
+      gl.texImage2D(gl.TEXTURE_2D,0,ifmt,w,h,0,comp===2?gl.RG_INTEGER:gl.RED_INTEGER,bps===2?gl.UNSIGNED_SHORT:gl.UNSIGNED_BYTE,view);
+      gl.pixelStorei(gl.UNPACK_ROW_LENGTH,0);
+    };
+    put(this.tY,lay[0],W,H,1);
+    if(nv) put(this.tU,lay[1],cw,ch,2); else { put(this.tU,lay[1],cw,ch,1); put(this.tV,lay[2],cw,ch,1); }
+    return {W,H,cw,ch,maxc,nv};
+  }
+  async render(vf, info, g){
+    const gl=this.gl, tcs=info.tcs||{}, fcs=vf.colorSpace||{};
+    const W0=vf.visibleRect?vf.visibleRect.width:vf.codedWidth, H0=vf.visibleRect?vf.visibleRect.height:vf.codedHeight;
+    let raw=false, m=null;
+    let rot = info.rot||0;
+    if(RAW_FMT[vf.format]){ try{ m=await this.uploadRaw(vf); raw=true; }catch(e){ console.warn("raw upload failed",e); } }
+    if(!raw && vf.rotation) rot = 0;                 // browser already applied rotation
+    const rw = (raw||!vf.rotation) && rot%180 ? H0 : W0, rh = (raw||!vf.rotation) && rot%180 ? W0 : H0;
+    this.ensure(rw,rh);
+    gl.bindFramebuffer(gl.FRAMEBUFFER,this.a.fb); gl.viewport(0,0,rw,rh);
+    const transfer = fcs.transfer || tcs.transfer || "";
+    const mode = raw ? (transfer==="hlg"?1:transfer==="pq"?2:0) : 0;
+    const prog = raw ? this.pYuv : this.pTex;
+    gl.useProgram(prog);
+    gl.uniform1f(this.U(prog,"ev"),g.ev); gl.uniform1f(this.U(prog,"contrast"),g.c); gl.uniform1f(this.U(prog,"sat"),g.s); gl.uniform1f(this.U(prog,"knee"),g.k);
+    gl.uniform2i(this.U(prog,"outS"),rw,rh); gl.uniform1i(this.U(prog,"rot"),rot);
+    if(raw){
+      const mx = fcs.matrix || tcs.matrix || (H0>=720?"bt709":"smpte170m");
+      const [kr,kb]=KRKB[mx]||KRKB.bt709;
+      const full = (fcs.fullRange ?? tcs.fullRange) ? 1 : 0;
+      for(const [i,t] of [this.tY,this.tU,this.tV].entries()){ gl.activeTexture(gl.TEXTURE0+i); gl.bindTexture(gl.TEXTURE_2D,t); }
+      gl.uniform1i(this.U(prog,"tY"),0); gl.uniform1i(this.U(prog,"tU"),1); gl.uniform1i(this.U(prog,"tV"),m.nv?1:2);
+      gl.uniform1i(this.U(prog,"nv12"),m.nv?1:0);
+      gl.uniform2i(this.U(prog,"srcY"),m.W,m.H); gl.uniform2i(this.U(prog,"srcC"),m.cw,m.ch);
+      gl.uniform1f(this.U(prog,"maxc"),m.maxc); gl.uniform1f(this.U(prog,"kr"),kr); gl.uniform1f(this.U(prog,"kb"),kb);
+      gl.uniform1i(this.U(prog,"full"),full); gl.uniform1i(this.U(prog,"mode"),mode);
+    } else {
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,this.tF);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,false);
+      gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,vf);
+      gl.uniform1i(this.U(prog,"tex"),0);
+    }
+    gl.drawArrays(gl.TRIANGLES,0,3);
+    // Lanczos-3: horizontal then vertical (+ light dither on the final 8-bit output)
+    gl.useProgram(this.pLz); gl.activeTexture(gl.TEXTURE0); gl.uniform1i(this.U(this.pLz,"src"),0);
+    gl.bindTexture(gl.TEXTURE_2D,this.a.t); gl.bindFramebuffer(gl.FRAMEBUFFER,this.b.fb); gl.viewport(0,0,this.outW,rh);
+    gl.uniform1i(this.U(this.pLz,"dir"),0); gl.uniform1i(this.U(this.pLz,"lim"),rw); gl.uniform1f(this.U(this.pLz,"scale"),rw/this.outW); gl.uniform1i(this.U(this.pLz,"dither"),0);
+    gl.drawArrays(gl.TRIANGLES,0,3);
+    gl.bindTexture(gl.TEXTURE_2D,this.b.t); gl.bindFramebuffer(gl.FRAMEBUFFER,this.c3.fb); gl.viewport(0,0,this.outW,this.outH);
+    gl.uniform1i(this.U(this.pLz,"dir"),1); gl.uniform1i(this.U(this.pLz,"lim"),rh); gl.uniform1f(this.U(this.pLz,"scale"),rh/this.outH); gl.uniform1i(this.U(this.pLz,"dither"),1);
+    gl.drawArrays(gl.TRIANGLES,0,3);
+    gl.readPixels(0,0,this.outW,this.outH,gl.RGBA,gl.UNSIGNED_BYTE,this.px);
+    return { px:this.px, w:this.outW, h:this.outH, path: raw ? (mode===1?"HLG":mode===2?"PQ":"SDR")+" · exact" : "browser-converted" };
+  }
+}
+
+function rgbaToI420(px,W,H,out){
+  const cw=W>>1, ch=H>>1, uo=W*H, vo=uo+cw*ch;
+  for(let y=0;y<H;y+=2){
+    const r0=y*W*4, r1=r0+W*4, yo0=y*W, yo1=yo0+W; let co=(y>>1)*cw;
+    for(let x=0;x<W;x+=2){
+      const i0=r0+x*4, i1=i0+4, i2=r1+x*4, i3=i2+4;
+      let R=px[i0],G=px[i0+1],B=px[i0+2]; const rs0=R,gs0=G,bs0=B;
+      out[yo0+x]=((47*R+157*G+16*B+128)>>8)+16;
+      R=px[i1];G=px[i1+1];B=px[i1+2]; out[yo0+x+1]=((47*R+157*G+16*B+128)>>8)+16; const rs1=R,gs1=G,bs1=B;
+      R=px[i2];G=px[i2+1];B=px[i2+2]; out[yo1+x]=((47*R+157*G+16*B+128)>>8)+16; const rs2=R,gs2=G,bs2=B;
+      R=px[i3];G=px[i3+1];B=px[i3+2]; out[yo1+x+1]=((47*R+157*G+16*B+128)>>8)+16;
+      const rs=rs0+rs1+rs2+R, gs=gs0+gs1+gs2+G, bs=bs0+bs1+bs2+B;
+      out[uo+co]=((-26*rs-87*gs+112*bs+512)>>10)+128;
+      out[vo+co]=((112*rs-102*gs-10*bs+512)>>10)+128;
+      co++;
+    }
+  }
+}
+
+// ------------------------------------------------------------------ x264 via ffmpeg.wasm (single-thread core)
+const CORE = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd/";
+const WORKER_SRC = `let core;
+self.onmessage = async (e) => {
+  const { id, type, data } = e.data;
+  try {
+    let r = null;
+    if (type === "load") {
+      importScripts(data.coreURL);
+      core = await self.createFFmpegCore({ mainScriptUrlOrBlob: data.coreURL + "#" + btoa(JSON.stringify({ wasmURL: data.wasmURL, workerURL: data.workerURL })) });
+      core.setLogger((d) => self.postMessage({ type: "log", data: d }));
+      r = true;
+    } else if (type === "exec") { core.setTimeout(-1); core.exec(...data.args); r = core.ret; core.reset(); }
+    else if (type === "write") { core.FS.writeFile(data.path, data.data); r = true; }
+    else if (type === "read") { r = core.FS.readFile(data.path); }
+    else if (type === "rm") { for (const f of data.paths) { try { core.FS.unlink(f); } catch (x) {} } r = true; }
+    self.postMessage({ id, type: "ok", data: r });
+  } catch (err) { self.postMessage({ id, type: "err", data: String(err && err.message || err) }); }
+};`;
+let ff = null;
+async function getFF(){
+  if(ff) return ff;
+  const blobURL = async (u,t)=>{ const r=await fetch(u); if(!r.ok) throw new Error("x264 engine download failed ("+r.status+")"); return URL.createObjectURL(new Blob([await r.arrayBuffer()],{type:t})); };
+  const coreURL = await blobURL(CORE+"ffmpeg-core.js","text/javascript");
+  const wasmURL = await blobURL(CORE+"ffmpeg-core.wasm","application/wasm");
+  const w = new Worker(URL.createObjectURL(new Blob([WORKER_SRC],{type:"text/javascript"})));
+  const o = { w, seq:0, pend:{}, onLog:null };
+  w.onmessage = e => {
+    const m=e.data;
+    if(m.type==="log"){ o.onLog&&o.onLog(m.data.message); return; }
+    const p=o.pend[m.id]; if(!p) return; delete o.pend[m.id];
+    m.type==="ok" ? p.res(m.data) : p.rej(new Error(m.data));
+  };
+  w.onerror = e => { for(const k in o.pend) o.pend[k].rej(new Error("x264 worker error")); o.pend={}; ff=null; };
+  o.call = (type,data,tr)=>new Promise((res,rej)=>{ const id=++o.seq; o.pend[id]={res,rej}; w.postMessage({id,type,data},tr||[]); });
+  o.kill = ()=>{ try{w.terminate();}catch{} for(const k in o.pend) o.pend[k].rej({cancelled:true}); o.pend={}; ff=null; };
+  await o.call("load",{coreURL,wasmURL});
+  return ff=o;
+}
+async function x264(blob, kbps, preset, totalFrames){
+  setStat("Loading x264 engine… (first time ~30 MB)");
+  const f = await getFF(); st.worker = f;
+  await f.call("write",{path:"in.mp4",data:new Uint8Array(await blob.arrayBuffer())});
+  let frame=0; const t0=performance.now();
+  f.onLog = m => { const r=/frame=\s*(\d+)/.exec(m); if(r){ frame=+r[1]; } };
+  const timer=setInterval(()=>{
+    const p=Math.min(1,frame/Math.max(1,totalFrames)); $("#fill").style.width=(p*100).toFixed(1)+"%";
+    const el=(performance.now()-t0)/1000; const eta = p>.03 ? Math.max(0,el/p-el) : null;
+    setStat(`Step 2/2 · x264 ${preset} · ${frame}/${totalFrames} frames`+(eta!=null?` · ~${eta<60?Math.ceil(eta)+" s":Math.ceil(eta/60)+" min"} left`:""));
+  },300);
+  let code;
+  try{
+    code = await f.call("exec",{args:["-hide_banner","-i","in.mp4","-map","0:v:0","-map","0:a:0?","-c:v","libx264","-preset",preset,"-crf","18",
+      "-maxrate",kbps+"k","-bufsize",(kbps*2)+"k","-profile:v","high","-pix_fmt","yuv420p","-bf","3",
+      "-color_range","tv","-colorspace","bt709","-color_primaries","bt709","-color_trc","bt709",
+      "-c:a","copy","-movflags","+faststart","-y","out.mp4"]});
+  } finally { clearInterval(timer); f.onLog=null; st.worker=null; }
+  if(st.stop) throw {cancelled:true};
+  if(code!==0) throw new Error("x264 failed (code "+code+")");
+  const data = await f.call("read",{path:"out.mp4"});
+  await f.call("rm",{paths:["in.mp4","out.mp4"]});
+  return new Blob([data],{type:"video/mp4"});
+}
+
+// ------------------------------------------------------------------ loading files
+let cur = null;
+const setStat = t => { $("#pstat").textContent = t; };
+const base = () => (cur.file.name.replace(/\.[^.]+$/,"")||"media").replace(/[^\w-]+/g,"_").slice(0,60);
+
 $("#drop").onclick = () => $("#file").click();
+$("#change").onclick = () => { if(!st.running) $("#file").click(); };
 $("#file").onchange = e => { if(e.target.files[0]) load(e.target.files[0]); e.target.value=""; };
 addEventListener("dragover", e=>e.preventDefault());
-addEventListener("drop", e=>{ e.preventDefault(); if(e.dataTransfer.files[0]) load(e.dataTransfer.files[0]); });
+addEventListener("drop", e=>{ e.preventDefault(); if(!st.running && e.dataTransfer.files[0]) load(e.dataTransfer.files[0]); });
 
 async function load(file){
   showErr(""); $("#out").hidden = true;
-  state.file = file;
-  state.kind = file.type.startsWith("image/") ? "image" : "video";
-  $("#mName").textContent = file.name;
-  $("#mSize").textContent = fmtSize(file.size);
-  $("#preview").hidden = false; $("#meta").hidden = false; $("#opts").hidden = false;
-  $("#drop").hidden = true;
+  if(cur){ try{ cur.prevFrame&&cur.prevFrame.close(); }catch{} cur=null; }
+  const isImg = file.type.startsWith("image/");
+  $("#drop").hidden = true; $("#cmpBox").hidden=false; $("#meta").hidden=false; $("#opts").hidden=false; $("#change").hidden=false;
+  $("#vOpts").hidden = isImg; $("#iOpts").hidden = !isImg;
+  $("#grade").hidden = isImg; $("#scrub").hidden = isImg;
+  $("#pv").hidden = isImg; $("#pc").hidden = isImg; document.querySelector("#cmpBox .cmp").hidden = isImg; $("#pi").hidden = !isImg;
+  $("#mName").textContent = file.name; $("#mSize").textContent = fmtSize(file.size); $("#mRes").textContent="…"; $("#mDur").textContent="…";
   const url = URL.createObjectURL(file);
-  $("#vOpts").hidden = state.kind!=="video"; $("#iOpts").hidden = state.kind!=="image";
-  $("#pv").hidden = state.kind!=="video"; $("#pi").hidden = state.kind!=="image";
-  if(state.kind==="image"){
-    $("#pi").src = url;
-    await $("#pi").decode().catch(()=>{});
-    $("#mRes").textContent = `${$("#pi").naturalWidth} × ${$("#pi").naturalHeight}`;
-    $("#mDur").textContent = "-";
-  } else {
-    $("#pv").src = url;
-    try{
-      const input = new Input({source:new BlobSource(file), formats:ALL_FORMATS});
-      const t = await input.getPrimaryVideoTrack();
-      if(!t) throw new Error("No video track found.");
-      const dur = await input.computeDuration();
-      $("#mRes").textContent = `${t.displayWidth} × ${t.displayHeight}`;
-      $("#mDur").textContent = dur.toFixed(1)+" s";
-      let isHdr = false;
-      try{ const cs = await t.getColorSpace(); isHdr = !!cs && (cs.transfer==="hlg" || cs.transfer==="pq"); }catch{}
-      $("#vHint").textContent = isHdr ? "HDR detected: will be converted to SDR so colours look right on WhatsApp. Slower than normal clips." : dur>60 ? "Longer than 60 s: WhatsApp will split it into several statuses." : "Output: H.264 + AAC, MP4, 1080p on the short side.";
-    }catch(err){ showErr("Can't read this video: "+(err.message||err)); }
+  if(isImg){
+    cur = {kind:"image", file};
+    $("#pi").src = url; await $("#pi").decode().catch(()=>{});
+    $("#mRes").textContent = `${$("#pi").naturalWidth} × ${$("#pi").naturalHeight}`; $("#mDur").textContent = "photo";
+    return;
   }
+  $("#pv").src = url;
+  try{
+    const input = new Input({source:new BlobSource(file), formats:ALL_FORMATS});
+    const track = await input.getPrimaryVideoTrack(); if(!track) throw new Error("No video track found.");
+    const dur = await input.computeDuration();
+    let tcs={}; try{ tcs=(await track.getColorSpace())||{}; }catch{}
+    let rot=0; try{ rot=track.rotation||0; }catch{}
+    let srcFps=30; try{ const s=await track.computePacketStats(120); if(s&&s.averagePacketRate) srcFps=s.averagePacketRate; }catch{}
+    const hdr = tcs.transfer==="hlg" || tcs.transfer==="pq";
+    cur = { kind:"video", file, input, track, dur, tcs, rot, srcFps, hdr, sink:new VideoSampleSink(track), pipe:new Pipe(), info:{rot,tcs}, prevFrame:null };
+    $("#mRes").textContent = `${track.displayWidth} × ${track.displayHeight}`;
+    $("#mDur").textContent = `${dur.toFixed(1)} s · ${hdr?(tcs.transfer==="hlg"?"HDR (HLG)":"HDR (PQ)"):"SDR"}`;
+    $("#kneeRow").hidden = !hdr;
+    $("#vHint").textContent = dur>60 ? "Longer than 60 s: WhatsApp splits it into several statuses." : (hdr?"HDR is converted to SDR with a soft highlight roll-off.":"");
+    const pt=$("#pt"); pt.max=Math.max(0.1,dur-0.1).toFixed(2); pt.value=Math.min(1,dur/2).toFixed(2);
+    await setPreviewTime(+pt.value);
+  }catch(err){ showErr("Can't read this video: "+(err.message||err)); }
 }
 
-// ---- processing
-$("#go").onclick = async () => {
-  if(!state.file) return;
-  showErr("");
-  $("#go").disabled = true; $("#prog").hidden = false; $("#fill").style.width = "0%";
+// ------------------------------------------------------------------ live preview
+let pvBusy=false, pvAgain=false, pvQueued=false;
+function schedulePreview(){ if(pvQueued) return; pvQueued=true; requestAnimationFrame(()=>{ pvQueued=false; drawPreview(); }); }
+async function setPreviewTime(t){
+  $("#ptO").textContent=t.toFixed(1)+"s"; try{ $("#pv").currentTime=t; }catch{}
+  if(!cur||cur.kind!=="video"||st.running) return;
   try{
-    const res = state.kind==="image" ? await doImage() : await doVideo();
-    showResult(res);
-  }catch(err){
-    if(err && err.cancelled) showErr("Cancelled.");
-    else showErr("Failed: "+(err.message||err));
-  }finally{
-    $("#go").disabled = false; $("#prog").hidden = true; state.conv = null;
-  }
+    const s=await cur.sink.getSample(t); if(!s) return;
+    if(cur.prevFrame) cur.prevFrame.close();
+    cur.prevFrame=s.toVideoFrame(); s.close();
+    await drawPreview();
+  }catch(e){ console.warn(e); }
+}
+let ptTimer; $("#pt").addEventListener("input",e=>{ clearTimeout(ptTimer); const v=+e.target.value; $("#ptO").textContent=v.toFixed(1)+"s"; ptTimer=setTimeout(()=>setPreviewTime(v),120); });
+async function drawPreview(){
+  if(!cur||cur.kind!=="video"||!cur.prevFrame||st.running) return;
+  if(pvBusy){ pvAgain=true; return; }
+  pvBusy=true;
+  try{
+    do{ pvAgain=false;
+      const r=await cur.pipe.render(cur.prevFrame,cur.info,st.grade);
+      const c=$("#pc"); c.width=r.w; c.height=r.h;
+      c.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(r.px.buffer,r.px.byteOffset,r.px.length),r.w,r.h),0,0);
+      $("#pcCap").textContent="Processed · "+r.path;
+    }while(pvAgain);
+  }catch(e){ showErr("Preview failed: "+(e.message||e)); }
+  finally{ pvBusy=false; }
+}
+
+// ------------------------------------------------------------------ processing
+$("#go").onclick = async () => {
+  if(!cur) return;
+  showErr(""); st.stop=false; st.running=true;
+  $("#go").disabled=true; $("#prog").hidden=false; $("#fill").style.width="0%";
+  let wl=null; try{ wl=await navigator.wakeLock?.request("screen"); }catch{}
+  try{ showResult(cur.kind==="image" ? await doImage() : await doVideo()); }
+  catch(err){ if(err&&err.cancelled) showErr("Cancelled."); else { console.error(err); showErr("Failed: "+(err&&err.message||err)); } }
+  finally{ st.running=false; $("#go").disabled=false; $("#prog").hidden=true; try{wl&&wl.release();}catch{} }
 };
-$("#cancel").onclick = () => { if(state.conv) state.conv.cancel().catch(()=>{}); };
+$("#cancel").onclick = () => { st.stop=true; setStat("Cancelling…"); if(st.worker) st.worker.kill(); };
 
 async function doVideo(){
-  if(!("VideoEncoder" in window)) throw new Error("This browser lacks WebCodecs. Use recent Chrome, Edge or Safari.");
-  const input = new Input({source:new BlobSource(state.file), formats:ALL_FORMATS});
-  const t = await input.getPrimaryVideoTrack();
-  if(!t) throw new Error("No video track found.");
-  const w0 = t.displayWidth, h0 = t.displayHeight, short = Math.min(w0,h0);
-  const scale = Math.min(1, 1080/short);               // never upscale
-  const w = even(w0*scale), h = even(h0*scale);
-  let hdr = false;
-  try{ const cs = await t.getColorSpace(); hdr = cs && (cs.transfer==="hlg" || cs.transfer==="pq"); }catch{}
-  if(hdr) return doVideoHdr(input, t, w, h);
+  if(!("VideoEncoder" in window)) throw new Error("This browser lacks WebCodecs. Use recent Chrome, Edge or Safari 16.4+.");
+  const c=cur, g=st.grade, useX = st.enc==="x264";
+  const fps = Math.max(1, Math.min(st.fps, Math.round(c.srcFps)||30)), step=1/fps;
+  const total = Math.max(1,Math.round(c.dur*fps));
+  const audioBps = 128e3;
+  const vBr = useX ? Math.max(12e6, Math.min(30e6, 8e8/Math.max(1,c.dur))) : Math.max(1e6, st.br*1e6 - audioBps);
   const output = new Output({format:new Mp4OutputFormat({fastStart:"in-memory"}), target:new BufferTarget()});
-  const conv = await Conversion.init({
-    input, output,
-    video:{ width:w, height:h, fit:"fill", frameRate:state.fps, bitrate:state.br*1e6, codec:"avc" },
-    audio:{ codec:"aac", bitrate:128e3 }
-  });
-  if(!conv.isValid) throw new Error("This video can't be converted in this browser.");
-  state.conv = conv;
-  conv.onProgress = p => { $("#fill").style.width=(p*100).toFixed(1)+"%"; $("#pstat").textContent=`Encoding ${w}×${h} @ ${state.fps} fps… ${(p*100).toFixed(0)}%`; };
-  try{ await conv.execute(); }
-  catch(e){ if(/cancel/i.test(String(e&&e.message))) throw {cancelled:true}; throw e; }
-  const blob = new Blob([output.target.buffer],{type:"video/mp4"});
-  return {blob, name:base()+`_wa_${Math.min(w,h)}p_${state.fps}fps.mp4`, info:`${w}×${h} · ${state.fps} fps · ${state.br} Mbps`, video:true};
-}
+  const vsrc = new VideoSampleSource({codec:"avc", bitrate:vBr});
+  output.addVideoTrack(vsrc,{frameRate:fps});
 
-// HDR (iPhone HLG/Dolby Vision) -> SDR BT.709. The browser tone-maps each decoded
-// frame when it is drawn onto a normal 2D canvas, so we re-encode from that canvas.
-async function doVideoHdr(input, t, w, h){
-  state.stop = false;
-  state.conv = { cancel: async () => { state.stop = true; } };
-  const fps = state.fps, step = 1/fps;
-  const dur = await input.computeDuration();
-  const output = new Output({format:new Mp4OutputFormat({fastStart:"in-memory"}), target:new BufferTarget()});
-
-  const canvas = document.createElement("canvas"); canvas.width=w; canvas.height=h;
-  const ctx = canvas.getContext("2d",{alpha:false});
-  ctx.imageSmoothingQuality = "high";
-  const vSource = new CanvasSource(canvas, { codec:"avc", bitrate: state.br*1e6 });
-  output.addVideoTrack(vSource, { frameRate: fps });
-
-  // Copy the original AAC audio untouched (iPhone audio is AAC).
-  let aTrack = null, aSource = null, audioNote = "";
+  let aTrack=null, aSrc=null, audioNote="";
   try{
-    aTrack = await input.getPrimaryAudioTrack();
-    if(aTrack && aTrack.codec === "aac"){
-      aSource = new EncodedAudioPacketSource("aac");
-      output.addAudioTrack(aSource);
-    } else if(aTrack){ audioNote = " · audio dropped (not AAC)"; aTrack = null; }
-  }catch{ aTrack = null; }
+    aTrack = await c.input.getPrimaryAudioTrack();
+    if(aTrack && aTrack.codec==="aac"){ aSrc=new EncodedAudioPacketSource("aac"); output.addAudioTrack(aSrc); }
+    else if(aTrack){ audioNote=" · audio dropped (not AAC)"; aTrack=null; }
+  }catch{ aTrack=null; }
 
   await output.start();
-
-  if(aTrack){
-    const cfg = await aTrack.getDecoderConfig();
-    const aSink = new EncodedPacketSink(aTrack);
-    let first = true;
-    for await (const pkt of aSink.packets()){
-      if(state.stop) throw {cancelled:true};
-      await aSource.add(pkt, first ? {decoderConfig:cfg} : undefined);
-      first = false;
+  const audioP = (async()=>{
+    if(!aTrack) return;
+    const cfg=await aTrack.getDecoderConfig(); let first=true;
+    for await(const pkt of new EncodedPacketSink(aTrack).packets()){
+      if(st.stop) throw {cancelled:true};
+      await aSrc.add(pkt, first?{decoderConfig:cfg}:undefined); first=false;
     }
-    aSource.close();
-  }
+    aSrc.close();
+  })();
+  audioP.catch(()=>{});
 
-  const sink = new CanvasSink(t, { width:w, height:h, fit:"fill", poolSize:2 });
-  let n = 0, t0 = null;
-  for await (const f of sink.canvases()){
-    if(state.stop) throw {cancelled:true};
-    if(t0 === null) t0 = f.timestamp;
-    const ts = f.timestamp - t0;
-    if(ts + 1e-4 < n*step) continue;                    // drop frames to reach target fps
-    ctx.drawImage(f.canvas, 0, 0, w, h);
-    await vSource.add(n*step, step);
-    n++;
-    const p = Math.min(1, ts/Math.max(.1,dur));
-    $("#fill").style.width=(p*100).toFixed(1)+"%";
-    $("#pstat").textContent=`HDR → SDR ${w}×${h} @ ${fps} fps… ${(p*100).toFixed(0)}%`;
+  if(c.prevFrame){ c.prevFrame.close(); c.prevFrame=null; }
+  let n=0, t0=null, W=0, H=0, i420=null, path="", nOut=0, lastUI=0; const tStart=performance.now();
+  for await(const s of c.sink.samples()){
+    if(st.stop){ s.close(); throw {cancelled:true}; }
+    if(t0===null) t0=s.timestamp;
+    const ts=s.timestamp-t0, idx=Math.round(ts/step);
+    if(idx<n || idx>=total+2){ s.close(); continue; }
+    const vf=s.toVideoFrame(); s.close();
+    let r; try{ r=await c.pipe.render(vf,c.info,g); } finally{ vf.close(); }
+    if(!i420){ W=r.w; H=r.h; i420=new Uint8Array(W*H*3/2); path=r.path; }
+    rgbaToI420(r.px,W,H,i420);
+    const f=new VideoFrame(i420,{format:"I420",codedWidth:W,codedHeight:H,timestamp:Math.round(idx*step*1e6),duration:Math.round(step*1e6),
+      colorSpace:{primaries:"bt709",transfer:"bt709",matrix:"bt709",fullRange:false}});
+    const smp=new VideoSample(f); await vsrc.add(smp); smp.close(); f.close();
+    n=idx+1; nOut++;
+    const now=performance.now();
+    if(now-lastUI>200){ lastUI=now;
+      const p=Math.min(1,ts/Math.max(.1,c.dur)); const el=(now-tStart)/1000;
+      $("#fill").style.width=(p*(useX?50:100)).toFixed(1)+"%";
+      setStat(`${useX?"Step 1/2 · ":""}Colour + scaling ${W}×${H} @ ${fps} fps · ${(p*100).toFixed(0)}%`+(p>.05?` · ~${Math.ceil(el/p-el)} s left`:""));
+    }
   }
-  vSource.close();
-  await output.finalize();
-  const blob = new Blob([output.target.buffer],{type:"video/mp4"});
-  return {blob, name:base()+`_wa_${Math.min(w,h)}p_${fps}fps_sdr.mp4`,
-          info:`${w}×${h} · ${fps} fps · ${state.br} Mbps · HDR→SDR${audioNote}`, video:true};
+  if(!nOut) throw new Error("No frames could be read from this video.");
+  vsrc.close(); await audioP; await output.finalize();
+  let blob = new Blob([output.target.buffer],{type:"video/mp4"});
+  if(useX){
+    $("#fill").style.width="0%";
+    try{ blob = await x264(blob, Math.round(st.br*1000), st.preset, nOut); }
+    catch(e){ if(e&&e.cancelled) throw e; console.warn("x264 failed",e); throw new Error("x264 engine failed ("+(e.message||e)+"). Switch to 'Fast' or check your connection."); }
+  }
+  return {blob, name:base()+`_wa_${Math.min(W,H)}p_${fps}fps${useX?"_x264":""}.mp4`,
+          info:`${W}×${H} · ${fps} fps · ${st.br} Mbps · ${useX?"x264 "+st.preset:"device encoder"} · colour: ${path}${audioNote}`, video:true};
 }
 
 async function doImage(){
-  $("#pstat").textContent = "Resizing…";
-  const bmp = await createImageBitmap(state.file, {imageOrientation:"from-image"});
-  const maxLong = 1920, long = Math.max(bmp.width,bmp.height);
-  const s = Math.min(1, maxLong/long);
-  const w = Math.round(bmp.width*s), h = Math.round(bmp.height*s);
-  const c = document.createElement("canvas"); c.width=w; c.height=h;
-  const ctx = c.getContext("2d",{alpha:false});
-  ctx.imageSmoothingQuality = "high"; ctx.drawImage(bmp,0,0,w,h);
-  const blob = await new Promise(r=>c.toBlob(r,"image/jpeg",state.q));
-  $("#fill").style.width="100%";
-  return {blob, name:base()+"_wa.jpg", info:`${w}×${h} · JPEG ${Math.round(state.q*100)}%`, video:false};
+  setStat("Resizing…");
+  const bmp = await createImageBitmap(cur.file,{imageOrientation:"from-image"});
+  const s=Math.min(1,1920/Math.max(bmp.width,bmp.height));
+  const w=Math.round(bmp.width*s), h=Math.round(bmp.height*s);
+  const c=document.createElement("canvas"); c.width=w; c.height=h;
+  const x=c.getContext("2d",{alpha:false}); x.imageSmoothingQuality="high"; x.drawImage(bmp,0,0,w,h);
+  const blob=await new Promise(r=>c.toBlob(r,"image/jpeg",st.q)); $("#fill").style.width="100%";
+  return {blob,name:base()+"_wa.jpg",info:`${w}×${h} · JPEG ${Math.round(st.q*100)}%`,video:false};
 }
-const base = () => (state.file.name.replace(/\.[^.]+$/,"")||"media").replace(/[^\w-]+/g,"_").slice(0,60);
 
 function showResult({blob,name,info,video}){
-  if(state.outUrl) URL.revokeObjectURL(state.outUrl);
-  state.outUrl = URL.createObjectURL(blob);
-  state.outFile = new File([blob],name,{type:blob.type});
-  $("#ov").hidden = !video; $("#oi").hidden = video;
-  (video?$("#ov"):$("#oi")).src = state.outUrl;
-  $("#oMeta").textContent = `${info} · ${fmtSize(blob.size)}`;
-  $("#dl").href = state.outUrl; $("#dl").download = name;
-  let can=false; try{ can = !!(navigator.canShare && navigator.canShare({files:[state.outFile]})); }catch{}
-  $("#share").hidden = !can;
-  $("#out").hidden = false;
-  $("#out").scrollIntoView({behavior:"smooth"});
+  if(st.outUrl) URL.revokeObjectURL(st.outUrl);
+  st.outUrl=URL.createObjectURL(blob); st.outFile=new File([blob],name,{type:blob.type});
+  $("#ov").hidden=!video; $("#oi").hidden=video;
+  (video?$("#ov"):$("#oi")).src=st.outUrl;
+  $("#oMeta").textContent=`${info} · ${fmtSize(blob.size)}`;
+  $("#dl").href=st.outUrl; $("#dl").download=name;
+  let can=false; try{ can=!!(navigator.canShare&&navigator.canShare({files:[st.outFile]})); }catch{}
+  $("#share").hidden=!can; $("#out").hidden=false; $("#out").scrollIntoView({behavior:"smooth"});
+  if(cur&&cur.kind==="video") setPreviewTime(+$("#pt").value);
 }
-$("#share").onclick = async () => { try{ await navigator.share({files:[state.outFile]}); }catch{} };
+$("#share").onclick=async()=>{ try{ await navigator.share({files:[st.outFile]}); }catch{} };
 </script>
 </body>
 </html>
