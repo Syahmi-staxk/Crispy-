@@ -79,7 +79,7 @@
     <div class="row"><label class="l" style="width:92px">Contrast</label><input type="range" id="gC" min="0.8" max="1.3" step="0.01"><output id="gCO"></output></div>
     <div class="row"><label class="l" style="width:92px">Colour</label><input type="range" id="gS" min="0.7" max="1.5" step="0.01"><output id="gSO"></output></div>
     <div class="row" id="kneeRow"><label class="l" style="width:92px">Highlights</label><input type="range" id="gK" min="0.5" max="0.95" step="0.01"><output id="gKO"></output></div>
-    <p class="hint" id="gHint">Compare the two previews. Too dark/dull → raise Brightness. Too harsh → lower Contrast. Blown-out sky → lower Highlights.</p>
+    <p class="hint" id="gHint">Default look is calibrated against a PureStatus sample. Compare the two previews. Too dark/dull → raise Brightness. Too harsh → lower Contrast. Blown-out sky → lower Highlights.</p>
   </div>
 
   <div class="card" id="opts" hidden>
@@ -145,14 +145,14 @@ const showErr = m => { $("#err").textContent = m||""; $("#err").hidden = !m; };
 
 // ------------------------------------------------------------------ settings
 const PRESETS = {
-  natural:{ev:0,   c:1.00, s:1.00, k:0.75},
-  bright: {ev:0.4, c:1.00, s:1.05, k:0.75},
-  punchy: {ev:0.3, c:1.10, s:1.15, k:0.80}
+  natural:{ev:0,   c:1.16, s:1.00, k:0.75},   // calibrated against a PureStatus sample
+  bright: {ev:0.3, c:1.16, s:1.05, k:0.75},
+  punchy: {ev:0.2, c:1.26, s:1.12, k:0.80}
 };
-const st = { fps:30, br:3.8, q:0.95, enc:"x264", preset:"medium", stop:false, running:false,
+const st = { fps:30, br:3.5, q:0.95, enc:"x264", preset:"medium", stop:false, running:false,
              grade:{...PRESETS.natural}, preset_name:"natural", outUrl:null, outFile:null, worker:null };
-try{ const s=JSON.parse(localStorage.getItem("wa_opt")||"null"); if(s){ Object.assign(st, s.o||{}); if(s.g) st.grade=s.g; } }catch{}
-const save = () => { try{ localStorage.setItem("wa_opt", JSON.stringify({o:{fps:st.fps,br:st.br,q:st.q,enc:st.enc,preset:st.preset,preset_name:st.preset_name}, g:st.grade})); }catch{} };
+try{ const s=JSON.parse(localStorage.getItem("wa_opt2")||"null"); if(s){ Object.assign(st, s.o||{}); if(s.g) st.grade={...PRESETS.natural,...s.g}; } }catch{}
+const save = () => { try{ localStorage.setItem("wa_opt2", JSON.stringify({o:{fps:st.fps,br:st.br,q:st.q,enc:st.enc,preset:st.preset,preset_name:st.preset_name}, g:st.grade})); }catch{} };
 
 function bindSeg(id, key, cb){
   const els = document.querySelectorAll(id+" button");
@@ -463,9 +463,9 @@ async function x264(blob, kbps, preset, totalFrames){
   let code;
   try{
     code = await f.call("exec",{args:["-hide_banner","-i","in.mp4","-map","0:v:0","-map","0:a:0?","-c:v","libx264","-preset",preset,"-crf","18",
-      "-maxrate",kbps+"k","-bufsize",(kbps*2)+"k","-profile:v","high","-pix_fmt","yuv420p","-bf","3",
+      "-maxrate",kbps+"k","-bufsize",kbps+"k","-profile:v","high","-pix_fmt","yuv420p","-bf","3",
       "-color_range","tv","-colorspace","bt709","-color_primaries","bt709","-color_trc","bt709",
-      "-c:a","copy","-movflags","+faststart","-y","out.mp4"]});
+      "-c:a","aac","-b:a","128k","-movflags","+faststart","-y","out.mp4"]});
   } finally { clearInterval(timer); f.onLog=null; st.worker=null; }
   if(st.stop) throw {cancelled:true};
   if(code!==0) throw new Error("x264 failed (code "+code+")");
